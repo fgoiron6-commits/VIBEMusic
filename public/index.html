@@ -64,6 +64,7 @@
       background: #1b1b1f; border-top: 1px solid var(--border);
       display: none; align-items: center; padding: 0 12px; gap: 12px; z-index: 40;
     }
+    .mini-progress-bar { position: absolute; top: 0; left: 0; height: 2px; background: var(--accent); width: 0%; transition: width 0.25s linear; }
     .mini-player img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; }
     .mini-info { flex: 1; min-width: 0; cursor: pointer; }
     .mini-title { font-size: 0.88rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -81,16 +82,19 @@
       position: fixed; inset: 0; background: linear-gradient(180deg, #1f1419 0%, #030303 55%);
       z-index: 80; display: none; flex-direction: column; padding: 16px 22px 24px;
     }
-    .fp-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .fp-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
     .fp-badge { font-size: 0.72rem; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 99px; font-weight: 600; }
-    .fp-art-wrap { flex: 1; display: grid; place-items: center; max-height: 310px; margin: 6px 0 18px; }
-    .fp-art { width: 270px; height: 270px; border-radius: 14px; object-fit: cover; box-shadow: 0 20px 50px rgba(0,0,0,0.75); }
-    .fp-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 12px; }
-    .fp-title { font-size: 1.35rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .fp-artist { font-size: 0.95rem; color: var(--muted); margin-top: 4px; }
-    .fp-controls { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 22px; padding: 0 12px; }
-    .play-circle { width: 66px; height: 66px; border-radius: 50%; background: #ffffff; color: #030303; display: grid; place-items: center; border: none; cursor: pointer; }
-    .fp-tabs { display: flex; border-top: 1px solid var(--border); padding-top: 12px; justify-content: space-around; }
+    .fp-art-wrap { flex: 1; display: grid; place-items: center; max-height: 290px; margin: 4px 0 14px; }
+    .fp-art { width: 255px; height: 255px; border-radius: 14px; object-fit: cover; box-shadow: 0 20px 50px rgba(0,0,0,0.75); }
+    .fp-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
+    .fp-title { font-size: 1.3rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fp-artist { font-size: 0.92rem; color: var(--muted); margin-top: 4px; }
+    .seek-wrap { margin-bottom: 10px; }
+    .seek-slider { width: 100%; accent-color: var(--accent); height: 4px; cursor: pointer; }
+    .time-row { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
+    .fp-controls { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 18px; padding: 0 12px; }
+    .play-circle { width: 64px; height: 64px; border-radius: 50%; background: #ffffff; color: #030303; display: grid; place-items: center; border: none; cursor: pointer; }
+    .fp-tabs { display: flex; border-top: 1px solid var(--border); padding-top: 10px; justify-content: space-around; }
     .fp-tab-btn { background: none; border: none; color: var(--muted); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px; cursor: pointer; padding: 6px 16px; }
     .fp-drawer {
       display: none; position: fixed; inset: 70px 0 0 0; background: #0c0c0e;
@@ -99,10 +103,12 @@
     }
     .fp-drawer-body { flex: 1; overflow-y: auto; margin-top: 12px; white-space: pre-line; line-height: 1.75; color: #e5e5ea; font-size: 0.95rem; }
     .loader { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 0.9rem; }
+    #ytHiddenWrap { position: fixed; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; bottom: 0; left: 0; }
   </style>
 </head>
 <body>
-  <audio id="audioEngine" preload="auto"></audio>
+  <div id="ytHiddenWrap"><div id="ytPlayer"></div></div>
+  <audio id="audiusEngine" preload="auto"></audio>
 
   <div class="topbar">
     <div class="brand" id="brandLogo">
@@ -113,7 +119,7 @@
       <button class="icon-btn" onclick="closeSearch()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
       </button>
-      <input type="text" id="searchInput" class="search-input" placeholder="Cari lagu, artis..." onkeydown="if(event.key==='Enter') doSearch()" />
+      <input type="text" id="searchInput" class="search-input" placeholder="Cari lagu full, artis..." onkeydown="if(event.key==='Enter') doSearch()" />
     </div>
     <div id="topActions">
       <button class="icon-btn" onclick="openSearch()">
@@ -130,27 +136,18 @@
     <div class="chip" onclick="filterMood(this, 'lagu galau indonesia')">Galau</div>
   </div>
 
-  <div id="viewHome">
-    <div id="homeContent"><div class="loader">Memuat katalog lagu...</div></div>
-  </div>
-
+  <div id="viewHome"><div id="homeContent"><div class="loader">Memuat katalog lagu full...</div></div></div>
   <div id="viewSearch" style="display:none;">
-    <div class="section-header">
-      <span class="section-sub">KATALOG MUSIK</span>
-      <span class="section-title" id="searchHeading">Hasil Pencarian</span>
-    </div>
+    <div class="section-header"><span class="section-sub">FULL TRACK CATALOG</span><span class="section-title" id="searchHeading">Hasil Pencarian</span></div>
     <div class="v-list" id="searchResults"></div>
   </div>
-
   <div id="viewLibrary" style="display:none;">
-    <div class="section-header">
-      <span class="section-sub">KOLEKSI TERSIMPAN</span>
-      <span class="section-title">Lagu Disukai</span>
-    </div>
+    <div class="section-header"><span class="section-sub">KOLEKSI TERSIMPAN</span><span class="section-title">Lagu Disukai</span></div>
     <div class="v-list" id="libraryList"></div>
   </div>
 
   <div class="mini-player" id="miniPlayer">
+    <div class="mini-progress-bar" id="miniProgress"></div>
     <img id="miniCover" src="" alt="" onclick="openFullPlayer()" />
     <div class="mini-info" onclick="openFullPlayer()">
       <div class="mini-title" id="miniTitle">Judul Lagu</div>
@@ -165,29 +162,16 @@
   </div>
 
   <nav class="bottom-nav">
-    <button class="nav-item active" id="navHome" onclick="switchTab('home')">
-      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-      <span>Home</span>
-    </button>
-    <button class="nav-item" id="navExplore" onclick="openSearch()">
-      <svg viewBox="0 0 24 24"><path d="M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z"/></svg>
-      <span>Explore</span>
-    </button>
-    <button class="nav-item" id="navLibrary" onclick="switchTab('library')">
-      <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z"/></svg>
-      <span>Library</span>
-    </button>
+    <button class="nav-item active" id="navHome" onclick="switchTab('home')"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>Home</span></button>
+    <button class="nav-item" id="navExplore" onclick="openSearch()"><svg viewBox="0 0 24 24"><path d="M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z"/></svg><span>Explore</span></button>
+    <button class="nav-item" id="navLibrary" onclick="switchTab('library')"><svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z"/></svg><span>Library</span></button>
   </nav>
 
   <div class="full-player" id="fullPlayer">
     <div class="fp-top">
-      <button class="icon-btn" onclick="closeFullPlayer()">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
-      </button>
-      <span class="fp-badge">VIBE STREAM • ONLINE</span>
-      <button class="icon-btn" onclick="openDrawer('lyrics')">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14 17H4v2h10v-2zm6-8H4v2h16V9zM4 15h16v-2H4v2zM4 5v2h16V5H4z"/></svg>
-      </button>
+      <button class="icon-btn" onclick="closeFullPlayer()"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg></button>
+      <span class="fp-badge" id="streamSourceBadge">FULL AUDIO • STREAM</span>
+      <button class="icon-btn" onclick="openDrawer('lyrics')"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14 17H4v2h10v-2zm6-8H4v2h16V9zM4 15h16v-2H4v2zM4 5v2h16V5H4z"/></svg></button>
     </div>
     <div class="fp-art-wrap"><img id="fpArt" class="fp-art" src="" alt="Cover" /></div>
     <div class="fp-meta">
@@ -195,18 +179,16 @@
         <div class="fp-title" id="fpTitle">Judul Lagu</div>
         <div class="fp-artist" id="fpArtist">Artis</div>
       </div>
-      <button class="icon-btn" id="likeBtn" onclick="toggleLike()">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg>
-      </button>
+      <button class="icon-btn" id="likeBtn" onclick="toggleLike()"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg></button>
+    </div>
+    <div class="seek-wrap">
+      <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" oninput="seekTo(this.value)" />
+      <div class="time-row"><span id="curTime">0:00</span><span id="durTime">0:00</span></div>
     </div>
     <div class="fp-controls">
-      <button class="icon-btn" onclick="playPrev()">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-      </button>
+      <button class="icon-btn" onclick="playPrev()"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
       <button class="play-circle" onclick="togglePlay()" id="fpPlayBtn"></button>
-      <button class="icon-btn" onclick="playNext()">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-      </button>
+      <button class="icon-btn" onclick="playNext()"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
     </div>
     <div class="fp-tabs">
       <button class="fp-tab-btn" onclick="openDrawer('queue')">UP NEXT</button>
@@ -222,45 +204,144 @@
     <div class="fp-drawer-body" id="drawerBody"></div>
   </div>
 
+  <script src="https://www.youtube.com/iframe_api"></script>
   <script>
-    const audio = document.getElementById("audioEngine");
+    let ytPlayer = null;
+    let ytReady = false;
+    let activeEngine = "yt"; // "yt" | "audius"
+    const audiusAudio = document.getElementById("audiusEngine");
+
     let queue = [];
     let currentIndex = -1;
+    let isPlaying = false;
     let likedSongs = JSON.parse(localStorage.getItem("vibe_liked") || "[]");
 
     const ICON_PLAY = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
     const ICON_PAUSE = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
 
-    audio.addEventListener("play", updatePlayIcons);
-    audio.addEventListener("pause", updatePlayIcons);
-    audio.addEventListener("ended", playNext);
+    function onYouTubeIframeAPIReady() {
+      ytPlayer = new YT.Player("ytPlayer", {
+        height: "1", width: "1",
+        playerVars: { autoplay: 1, controls: 0, playsinline: 1, rel: 0 },
+        events: {
+          onReady: () => { ytReady = true; },
+          onStateChange: (e) => {
+            if (activeEngine !== "yt") return;
+            if (e.data === YT.PlayerState.PLAYING) { isPlaying = true; updatePlayIcons(); }
+            if (e.data === YT.PlayerState.PAUSED) { isPlaying = false; updatePlayIcons(); }
+            if (e.data === YT.PlayerState.ENDED) { playNext(); }
+          },
+          onError: () => {
+            // Jika video YT diblokir embed-nya, otomatis lempar ke Audius Full Stream
+            if (currentIndex >= 0) playViaAudius(queue[currentIndex]);
+          }
+        }
+      });
+    }
+
+    audiusAudio.addEventListener("play", () => { if (activeEngine === "audius") { isPlaying = true; updatePlayIcons(); } });
+    audiusAudio.addEventListener("pause", () => { if (activeEngine === "audius") { isPlaying = false; updatePlayIcons(); } });
+    audiusAudio.addEventListener("ended", () => { if (activeEngine === "audius") playNext(); });
+
+    setInterval(() => {
+      let cur = 0, dur = 0;
+      if (activeEngine === "yt" && ytReady && ytPlayer.getCurrentTime) {
+        cur = ytPlayer.getCurrentTime() || 0;
+        dur = ytPlayer.getDuration() || 0;
+      } else if (activeEngine === "audius") {
+        cur = audiusAudio.currentTime || 0;
+        dur = audiusAudio.duration || 0;
+      }
+      if (dur > 0) {
+        const pct = (cur / dur) * 100;
+        document.getElementById("seekSlider").value = pct;
+        document.getElementById("miniProgress").style.width = pct + "%";
+        document.getElementById("curTime").textContent = fmtSec(cur);
+        document.getElementById("durTime").textContent = fmtSec(dur);
+      }
+    }, 500);
+
+    function fmtSec(s) {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${String(sec).padStart(2, "0")}`;
+    }
+
+    function seekTo(pct) {
+      if (activeEngine === "yt" && ytReady && ytPlayer.getDuration) {
+        ytPlayer.seekTo((pct / 100) * ytPlayer.getDuration(), true);
+      } else if (activeEngine === "audius" && audiusAudio.duration) {
+        audiusAudio.currentTime = (pct / 100) * audiusAudio.duration;
+      }
+    }
 
     async function fetchCatalog(query, limit = 12) {
-      // Coba backend lokal/Vercel dulu, jika gagal langsung tarik via iTunes API
+      // 1. Coba endpoint Python Vercel (/api/search) yang memakai ytmusicapi (punya videoId asli)
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.results && data.results.length > 0) return data.results;
+          if (data.results && data.results.length > 0 && !data.results[0].audioUrl) {
+            return data.results.map(x => ({ ...x, source: "yt" }));
+          }
         }
       } catch {}
 
+      // 2. Fallback metadata HD dari iTunes (nanti diputar full via YouTube/Audius resolver)
       const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
       const json = await itunes.json();
       return (json.results || []).map(item => ({
-        videoId: String(item.trackId),
+        videoId: "",
+        trackId: String(item.trackId),
         title: item.trackName,
         artist: item.artistName,
-        album: item.collectionName || "Single",
-        duration: formatMs(item.trackTimeMillis),
+        duration: fmtSec((item.trackTimeMillis || 0) / 1000),
         cover: (item.artworkUrl100 || "").replace("100x100bb", "500x500bb"),
-        audioUrl: item.previewUrl
+        source: "resolve"
       }));
     }
 
-    function formatMs(ms) {
-      const total = Math.floor((ms || 0) / 1000);
-      return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+    async function resolveYouTubeVideoId(title, artist) {
+      const q = `${title} ${artist} official audio`;
+      // Jalur A: Backend Python ytmusicapi
+      try {
+        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        if (r.ok) {
+          const d = await r.json();
+          const hit = (d.results || []).find(x => x.videoId && x.videoId.length === 11);
+          if (hit) return hit.videoId;
+        }
+      } catch {}
+
+      // Jalur B: Piped Public API (bebas CORS, mengembalikan videoId YouTube full)
+      const instances = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de"];
+      for (const host of instances) {
+        try {
+          const res = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`);
+          const data = await res.json();
+          const item = (data.items || [])[0];
+          if (item && item.url) {
+            const vid = item.url.split("v=")[1]?.slice(0, 11);
+            if (vid) return vid;
+          }
+        } catch {}
+      }
+      return null;
+    }
+
+    async function playViaAudius(track) {
+      activeEngine = "audius";
+      if (ytReady && ytPlayer.stopVideo) ytPlayer.stopVideo();
+      document.getElementById("streamSourceBadge").textContent = "FULL AUDIO • AUDIUS";
+      try {
+        const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(track.title + " " + track.artist)}&limit=1`);
+        const json = await res.json();
+        const hit = (json.data || [])[0];
+        if (hit && hit.id) {
+          audiusAudio.src = `https://discoveryprovider.audius.co/v1/tracks/${hit.id}/stream`;
+          audiusAudio.play();
+        }
+      } catch {}
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
@@ -272,27 +353,17 @@
           fetchCatalog("Daniel Caesar Frank Ocean LANY", 10)
         ]);
         queue = [...qp, ...tr, ...ch];
-
         container.innerHTML = `
           <div class="section">
-            <div class="section-header">
-              <span class="section-sub">PILIHAN CEPAT</span>
-              <span class="section-title">Quick picks</span>
-            </div>
+            <div class="section-header"><span class="section-sub">PILIHAN CEPAT (FULL)</span><span class="section-title">Quick picks</span></div>
             <div class="quick-grid">${qp.map(t => renderSongRow(t)).join("")}</div>
           </div>
           <div class="section">
-            <div class="section-header">
-              <span class="section-sub">LAGI POPULER</span>
-              <span class="section-title">Trending Indonesia</span>
-            </div>
+            <div class="section-header"><span class="section-sub">LAGI POPULER</span><span class="section-title">Trending Indonesia</span></div>
             <div class="cards-row">${tr.map(t => renderVCard(t)).join("")}</div>
           </div>
           <div class="section">
-            <div class="section-header">
-              <span class="section-sub">SANTAI & VIBE</span>
-              <span class="section-title">Chill & R&B Mix</span>
-            </div>
+            <div class="section-header"><span class="section-sub">SANTAI & VIBE</span><span class="section-title">Chill & R&B Mix</span></div>
             <div class="cards-row">${ch.map(t => renderVCard(t)).join("")}</div>
           </div>
         `;
@@ -327,7 +398,8 @@
 
     function selectTrack(encoded) {
       const track = JSON.parse(decodeURIComponent(encoded));
-      let idx = queue.findIndex(x => x.videoId === track.videoId);
+      const key = track.videoId || track.trackId || track.title;
+      let idx = queue.findIndex(x => (x.videoId || x.trackId || x.title) === key);
       if (idx === -1) { queue.unshift(track); idx = 0; }
       playAtIndex(idx);
     }
@@ -345,31 +417,39 @@
       document.getElementById("fpArt").src = track.cover;
       document.getElementById("fpTitle").textContent = track.title;
       document.getElementById("fpArtist").textContent = track.artist;
+      document.getElementById("streamSourceBadge").textContent = "MENCARI FULL AUDIO...";
       updateLikeIcon();
 
-      if (track.audioUrl) {
-        audio.src = track.audioUrl;
-        audio.play();
+      let vid = track.videoId && track.videoId.length === 11 ? track.videoId : null;
+      if (!vid) {
+        vid = await resolveYouTubeVideoId(track.title, track.artist);
+        if (vid) track.videoId = vid;
+      }
+
+      if (vid && ytReady) {
+        activeEngine = "yt";
+        audiusAudio.pause();
+        document.getElementById("streamSourceBadge").textContent = "FULL SONG • YOUTUBE";
+        ytPlayer.loadVideoById(vid);
+        ytPlayer.playVideo();
       } else {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(track.title + " " + track.artist)}&entity=song&limit=1`);
-        const json = await res.json();
-        if (json.results && json.results[0]?.previewUrl) {
-          audio.src = json.results[0].previewUrl;
-          audio.play();
-        }
+        await playViaAudius(track);
       }
     }
 
     function togglePlay() {
-      if (!audio.src) return;
-      audio.paused ? audio.play() : audio.pause();
+      if (activeEngine === "yt" && ytReady) {
+        isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
+      } else if (activeEngine === "audius") {
+        audiusAudio.paused ? audiusAudio.play() : audiusAudio.pause();
+      }
     }
 
     function playNext() { if (queue.length) playAtIndex((currentIndex + 1) % queue.length); }
     function playPrev() { if (queue.length) playAtIndex((currentIndex - 1 + queue.length) % queue.length); }
 
     function updatePlayIcons() {
-      const icon = audio.paused ? ICON_PLAY : ICON_PAUSE;
+      const icon = isPlaying ? ICON_PAUSE : ICON_PLAY;
       document.getElementById("miniPlayBtn").innerHTML = icon;
       document.getElementById("fpPlayBtn").innerHTML = icon;
     }
@@ -395,13 +475,9 @@
       switchTab("search");
       document.getElementById("searchHeading").textContent = `Hasil: "${q}"`;
       const box = document.getElementById("searchResults");
-      box.innerHTML = '<div class="loader">Mencari lagu...</div>';
-
+      box.innerHTML = '<div class="loader">Mencari lagu full...</div>';
       const items = await fetchCatalog(q, 20);
-      if (!items.length) {
-        box.innerHTML = '<div class="loader">Lagu tidak ditemukan.</div>';
-        return;
-      }
+      if (!items.length) { box.innerHTML = '<div class="loader">Lagu tidak ditemukan.</div>'; return; }
       queue = items;
       box.innerHTML = items.map(t => renderSongRow(t)).join("");
     }
@@ -428,7 +504,8 @@
     function toggleLike() {
       if (currentIndex < 0) return;
       const track = queue[currentIndex];
-      const idx = likedSongs.findIndex(x => x.videoId === track.videoId);
+      const key = track.videoId || track.trackId || track.title;
+      const idx = likedSongs.findIndex(x => (x.videoId || x.trackId || x.title) === key);
       idx > -1 ? likedSongs.splice(idx, 1) : likedSongs.unshift(track);
       localStorage.setItem("vibe_liked", JSON.stringify(likedSongs));
       updateLikeIcon();
@@ -436,15 +513,15 @@
 
     function updateLikeIcon() {
       if (currentIndex < 0) return;
-      const isLiked = likedSongs.some(x => x.videoId === queue[currentIndex].videoId);
+      const track = queue[currentIndex];
+      const key = track.videoId || track.trackId || track.title;
+      const isLiked = likedSongs.some(x => (x.videoId || x.trackId || x.title) === key);
       document.getElementById("likeBtn").style.color = isLiked ? "#FF0055" : "#ffffff";
     }
 
     function renderLibrary() {
       const box = document.getElementById("libraryList");
-      box.innerHTML = likedSongs.length
-        ? likedSongs.map(t => renderSongRow(t)).join("")
-        : '<div class="loader">Belum ada lagu yang disukai.</div>';
+      box.innerHTML = likedSongs.length ? likedSongs.map(t => renderSongRow(t)).join("") : '<div class="loader">Belum ada lagu yang disukai.</div>';
     }
 
     async function openDrawer(type) {
@@ -473,9 +550,7 @@
           const res = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(t.artist)}&track_name=${encodeURIComponent(t.title)}`);
           const data = await res.json();
           body.textContent = data.plainLyrics || "Lirik tidak tersedia untuk lagu ini.";
-        } catch {
-          body.textContent = "Lirik tidak ditemukan.";
-        }
+        } catch { body.textContent = "Lirik tidak ditemukan."; }
       }
     }
 
