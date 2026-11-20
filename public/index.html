@@ -228,7 +228,9 @@
 
     async function resolveFullVideoId(track) {
       if (track.videoId && track.videoId.length === 11) return track.videoId;
-      const q = `${track.title} ${track.artist} official audio`;
+      const q = `${track.title} ${track.artist} audio`;
+
+      // 1. Coba backend /api/search
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
@@ -237,6 +239,49 @@
           if (hit) return hit.videoId;
         }
       } catch {}
+
+      // 2. Pencarian langsung dari jaringan HP (Piped & Invidious Search API)
+      const pipedHosts = [
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi.adminforge.de",
+        "https://api.piped.private.coffee",
+        "https://pipedapi.drgns.space"
+      ];
+      for (const host of pipedHosts) {
+        try {
+          const ctrl = new AbortController();
+          const tmr = setTimeout(() => ctrl.abort(), 3000);
+          const r = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`, { signal: ctrl.signal });
+          clearTimeout(tmr);
+          if (r.ok) {
+            const d = await r.json();
+            const item = (d.items || []).find(i => i.url && i.url.includes("v="));
+            if (item) {
+              const vid = item.url.split("v=")[1].slice(0, 11);
+              if (vid.length === 11) return vid;
+            }
+          }
+        } catch {}
+      }
+
+      const invHosts = [
+        "https://inv.nadeko.net",
+        "https://invidious.nerdvpn.de",
+        "https://yt.artemislena.eu"
+      ];
+      for (const host of invHosts) {
+        try {
+          const ctrl = new AbortController();
+          const tmr = setTimeout(() => ctrl.abort(), 3000);
+          const r = await fetch(`${host}/api/v1/search?q=${encodeURIComponent(q)}&type=video`, { signal: ctrl.signal });
+          clearTimeout(tmr);
+          if (r.ok) {
+            const arr = await r.json();
+            const hit = (arr || []).find(v => v.videoId && v.videoId.length === 11);
+            if (hit) return hit.videoId;
+          }
+        } catch {}
+      }
       return null;
     }
 
@@ -344,12 +389,7 @@
         return;
       }
 
-      if (track.previewUrl) {
-        activeEngine = "native";
-        document.getElementById("streamSourceBadge").textContent = "PREVIEW 30s";
-        bgAudio.src = track.previewUrl;
-        bgAudio.play();
-      }
+      document.getElementById("streamSourceBadge").textContent = "SERVER SIBUK • COBA LAGU LAIN";
     }
 
     function togglePlay() { if (activeEngine === "native") bgAudio.paused ? bgAudio.play() : bgAudio.pause(); else if (activeEngine === "yt" && ytReady && ytPlayer) isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo(); }
