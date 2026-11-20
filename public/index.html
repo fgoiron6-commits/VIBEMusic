@@ -208,9 +208,10 @@
   <script>
     let ytPlayer = null;
     let ytReady = false;
-    let activeEngine = "yt"; // "yt" | "audius"
+    let activeEngine = "yt";
     const audiusAudio = document.getElementById("audiusEngine");
 
+    let trackStore = {}; // Kamus aman anti-kutip untuk semua item lagu
     let queue = [];
     let currentIndex = -1;
     let isPlaying = false;
@@ -218,6 +219,16 @@
 
     const ICON_PLAY = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
     const ICON_PAUSE = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+
+    function registerTrack(t) {
+      const uid = "trk_" + Math.random().toString(36).slice(2, 10);
+      trackStore[uid] = t;
+      return uid;
+    }
+
+    function escHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+    }
 
     function onYouTubeIframeAPIReady() {
       ytPlayer = new YT.Player("ytPlayer", {
@@ -232,7 +243,6 @@
             if (e.data === YT.PlayerState.ENDED) { playNext(); }
           },
           onError: () => {
-            // Jika video YT diblokir embed-nya, otomatis lempar ke Audius Full Stream
             if (currentIndex >= 0) playViaAudius(queue[currentIndex]);
           }
         }
@@ -245,7 +255,7 @@
 
     setInterval(() => {
       let cur = 0, dur = 0;
-      if (activeEngine === "yt" && ytReady && ytPlayer.getCurrentTime) {
+      if (activeEngine === "yt" && ytReady && ytPlayer && ytPlayer.getCurrentTime) {
         cur = ytPlayer.getCurrentTime() || 0;
         dur = ytPlayer.getDuration() || 0;
       } else if (activeEngine === "audius") {
@@ -268,7 +278,7 @@
     }
 
     function seekTo(pct) {
-      if (activeEngine === "yt" && ytReady && ytPlayer.getDuration) {
+      if (activeEngine === "yt" && ytReady && ytPlayer && ytPlayer.getDuration) {
         ytPlayer.seekTo((pct / 100) * ytPlayer.getDuration(), true);
       } else if (activeEngine === "audius" && audiusAudio.duration) {
         audiusAudio.currentTime = (pct / 100) * audiusAudio.duration;
@@ -276,7 +286,6 @@
     }
 
     async function fetchCatalog(query, limit = 12) {
-      // 1. Coba endpoint Python Vercel (/api/search) yang memakai ytmusicapi (punya videoId asli)
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         if (res.ok) {
@@ -287,7 +296,6 @@
         }
       } catch {}
 
-      // 2. Fallback metadata HD dari iTunes (nanti diputar full via YouTube/Audius resolver)
       const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
       const json = await itunes.json();
       return (json.results || []).map(item => ({
@@ -297,13 +305,13 @@
         artist: item.artistName,
         duration: fmtSec((item.trackTimeMillis || 0) / 1000),
         cover: (item.artworkUrl100 || "").replace("100x100bb", "500x500bb"),
+        previewUrl: item.previewUrl || "",
         source: "resolve"
       }));
     }
 
     async function resolveYouTubeVideoId(title, artist) {
       const q = `${title} ${artist} official audio`;
-      // Jalur A: Backend Python ytmusicapi
       try {
         const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         if (r.ok) {
@@ -313,11 +321,13 @@
         }
       } catch {}
 
-      // Jalur B: Piped Public API (bebas CORS, mengembalikan videoId YouTube full)
-      const instances = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de"];
+      const instances = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de", "https://api.piped.private.coffee"];
       for (const host of instances) {
         try {
-          const res = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`);
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3500);
+          const res = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`, { signal: controller.signal });
+          clearTimeout(timer);
           const data = await res.json();
           const item = (data.items || [])[0];
           if (item && item.url) {
@@ -331,7 +341,7 @@
 
     async function playViaAudius(track) {
       activeEngine = "audius";
-      if (ytReady && ytPlayer.stopVideo) ytPlayer.stopVideo();
+      if (ytReady && ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
       document.getElementById("streamSourceBadge").textContent = "FULL AUDIO • AUDIUS";
       try {
         const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(track.title + " " + track.artist)}&limit=1`);
@@ -339,9 +349,16 @@
         const hit = (json.data || [])[0];
         if (hit && hit.id) {
           audiusAudio.src = `https://discoveryprovider.audius.co/v1/tracks/${hit.id}/stream`;
-          audiusAudio.play();
+          await audiusAudio.play();
+          return;
         }
       } catch {}
+      // Cadangan terakhir jika Audius kosong: previewUrl
+      if (track.previewUrl) {
+        document.getElementById("streamSourceBadge").textContent = "PREVIEW AUDIO";
+        audiusAudio.src = track.previewUrl;
+        audiusAudio.play();
+      }
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
@@ -373,34 +390,38 @@
     });
 
     function renderSongRow(t) {
-      const safe = encodeURIComponent(JSON.stringify(t));
+      const uid = registerTrack(t);
       return `
-        <div class="song-row" onclick="selectTrack('${safe}')">
-          <img src="${t.cover}" loading="lazy" />
+        <div class="song-row" onclick="selectTrackById('${uid}')">
+          <img src="${escHtml(t.cover)}" loading="lazy" />
           <div class="song-meta">
-            <div class="song-title">${t.title}</div>
-            <div class="song-artist">${t.artist} • ${t.duration}</div>
+            <div class="song-title">${escHtml(t.title)}</div>
+            <div class="song-artist">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
           </div>
         </div>
       `;
     }
 
     function renderVCard(t) {
-      const safe = encodeURIComponent(JSON.stringify(t));
+      const uid = registerTrack(t);
       return `
-        <div class="v-card" onclick="selectTrack('${safe}')">
-          <img src="${t.cover}" loading="lazy" />
-          <div class="v-card-title">${t.title}</div>
-          <div class="v-card-sub">${t.artist}</div>
+        <div class="v-card" onclick="selectTrackById('${uid}')">
+          <img src="${escHtml(t.cover)}" loading="lazy" />
+          <div class="v-card-title">${escHtml(t.title)}</div>
+          <div class="v-card-sub">${escHtml(t.artist)}</div>
         </div>
       `;
     }
 
-    function selectTrack(encoded) {
-      const track = JSON.parse(decodeURIComponent(encoded));
-      const key = track.videoId || track.trackId || track.title;
-      let idx = queue.findIndex(x => (x.videoId || x.trackId || x.title) === key);
-      if (idx === -1) { queue.unshift(track); idx = 0; }
+    function selectTrackById(uid) {
+      const track = trackStore[uid];
+      if (!track) return;
+      const key = track.videoId || track.trackId || (track.title + track.artist);
+      let idx = queue.findIndex(x => (x.videoId || x.trackId || (x.title + x.artist)) === key);
+      if (idx === -1) {
+        queue.unshift(track);
+        idx = 0;
+      }
       playAtIndex(idx);
     }
 
@@ -426,7 +447,7 @@
         if (vid) track.videoId = vid;
       }
 
-      if (vid && ytReady) {
+      if (vid && ytReady && ytPlayer && ytPlayer.loadVideoById) {
         activeEngine = "yt";
         audiusAudio.pause();
         document.getElementById("streamSourceBadge").textContent = "FULL SONG • YOUTUBE";
@@ -438,7 +459,7 @@
     }
 
     function togglePlay() {
-      if (activeEngine === "yt" && ytReady) {
+      if (activeEngine === "yt" && ytReady && ytPlayer) {
         isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
       } else if (activeEngine === "audius") {
         audiusAudio.paused ? audiusAudio.play() : audiusAudio.pause();
@@ -476,10 +497,13 @@
       document.getElementById("searchHeading").textContent = `Hasil: "${q}"`;
       const box = document.getElementById("searchResults");
       box.innerHTML = '<div class="loader">Mencari lagu full...</div>';
-      const items = await fetchCatalog(q, 20);
-      if (!items.length) { box.innerHTML = '<div class="loader">Lagu tidak ditemukan.</div>'; return; }
-      queue = items;
-      box.innerHTML = items.map(t => renderSongRow(t)).join("");
+      try {
+        const items = await fetchCatalog(q, 20);
+        if (!items.length) { box.innerHTML = '<div class="loader">Lagu tidak ditemukan.</div>'; return; }
+        box.innerHTML = items.map(t => renderSongRow(t)).join("");
+      } catch {
+        box.innerHTML = '<div class="loader">Gagal mencari lagu. Coba lagi.</div>';
+      }
     }
 
     function filterMood(el, query) {
@@ -504,8 +528,8 @@
     function toggleLike() {
       if (currentIndex < 0) return;
       const track = queue[currentIndex];
-      const key = track.videoId || track.trackId || track.title;
-      const idx = likedSongs.findIndex(x => (x.videoId || x.trackId || x.title) === key);
+      const key = track.videoId || track.trackId || (track.title + track.artist);
+      const idx = likedSongs.findIndex(x => (x.videoId || x.trackId || (x.title + x.artist)) === key);
       idx > -1 ? likedSongs.splice(idx, 1) : likedSongs.unshift(track);
       localStorage.setItem("vibe_liked", JSON.stringify(likedSongs));
       updateLikeIcon();
@@ -514,8 +538,8 @@
     function updateLikeIcon() {
       if (currentIndex < 0) return;
       const track = queue[currentIndex];
-      const key = track.videoId || track.trackId || track.title;
-      const isLiked = likedSongs.some(x => (x.videoId || x.trackId || x.title) === key);
+      const key = track.videoId || track.trackId || (track.title + track.artist);
+      const isLiked = likedSongs.some(x => (x.videoId || x.trackId || (x.title + x.artist)) === key);
       document.getElementById("likeBtn").style.color = isLiked ? "#FF0055" : "#ffffff";
     }
 
@@ -534,10 +558,10 @@
         title.textContent = "UP NEXT (ANTREAN)";
         body.innerHTML = queue.map((t, i) => `
           <div class="song-row" onclick="playAtIndex(${i}); closeDrawer();" style="margin-bottom:8px;">
-            <img src="${t.cover}" />
+            <img src="${escHtml(t.cover)}" />
             <div class="song-meta">
-              <div class="song-title ${i === currentIndex ? 'playing-text' : ''}">${t.title}</div>
-              <div class="song-artist">${t.artist}</div>
+              <div class="song-title ${i === currentIndex ? 'playing-text' : ''}">${escHtml(t.title)}</div>
+              <div class="song-artist">${escHtml(t.artist)}</div>
             </div>
           </div>
         `).join("");
