@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Music</title>
+  <title>VIBE Music</title>
   <style>
     :root {
       --bg: #030303;
@@ -15,7 +15,7 @@
       --accent: #FF0055;
       --border: rgba(255, 255, 255, 0.08);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background: var(--bg); color: var(--text); padding-bottom: 130px; overflow-x: hidden; }
     .topbar {
       position: sticky; top: 0; z-index: 30;
@@ -25,26 +25,15 @@
       backdrop-filter: blur(12px);
     }
     .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.5px; }
-    .brand-icon {
-      width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
-      display: grid; place-items: center;
-    }
+    .brand-icon { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; }
     .brand-icon svg { width: 14px; height: 14px; fill: #fff; margin-left: 2px; }
-    .top-actions { display: flex; align-items: center; gap: 14px; }
     .icon-btn { background: none; border: none; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 4px; }
     .search-bar-wrap { display: none; align-items: center; gap: 8px; width: 100%; }
     .search-bar-wrap.active { display: flex; }
-    .search-input {
-      flex: 1; background: var(--surface-elevated); border: none; color: #fff;
-      padding: 9px 14px; border-radius: 99px; font-size: 0.92rem; outline: none;
-    }
+    .search-input { flex: 1; background: var(--surface-elevated); border: none; color: #fff; padding: 9px 14px; border-radius: 99px; font-size: 0.92rem; outline: none; }
     .chips { display: flex; gap: 8px; overflow-x: auto; padding: 6px 16px 14px; scrollbar-width: none; }
     .chips::-webkit-scrollbar { display: none; }
-    .chip {
-      background: var(--chip-bg); border: 1px solid var(--border); color: #fff;
-      padding: 7px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500;
-      white-space: nowrap; cursor: pointer; transition: 0.15s;
-    }
+    .chip { background: var(--chip-bg); border: 1px solid var(--border); color: #fff; padding: 7px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; white-space: nowrap; cursor: pointer; }
     .chip.active { background: #ffffff; color: #030303; font-weight: 700; }
     .section { margin-bottom: 24px; }
     .section-header { padding: 0 16px 12px; display: flex; flex-direction: column; }
@@ -56,10 +45,7 @@
       overflow-x: auto; padding: 0 16px; scroll-snap-type: x mandatory; scrollbar-width: none;
     }
     .quick-grid::-webkit-scrollbar { display: none; }
-    .song-row {
-      display: flex; align-items: center; gap: 12px; scroll-snap-align: start;
-      padding: 4px; border-radius: 8px; cursor: pointer;
-    }
+    .song-row { display: flex; align-items: center; gap: 12px; scroll-snap-align: start; padding: 4px; border-radius: 8px; cursor: pointer; }
     .song-row:active { background: var(--surface-elevated); }
     .song-row img { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; background: #1e1e1e; flex-shrink: 0; }
     .song-meta { flex: 1; min-width: 0; }
@@ -88,10 +74,7 @@
       background: #0a0a0a; border-top: 1px solid var(--border);
       display: flex; justify-content: space-around; align-items: center; z-index: 45;
     }
-    .nav-item {
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-      color: var(--muted); font-size: 0.68rem; background: none; border: none; cursor: pointer;
-    }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: 0.68rem; background: none; border: none; cursor: pointer; }
     .nav-item.active { color: #ffffff; font-weight: 700; }
     .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
     .full-player {
@@ -106,40 +89,33 @@
     .fp-title { font-size: 1.35rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .fp-artist { font-size: 0.95rem; color: var(--muted); margin-top: 4px; }
     .fp-controls { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 22px; padding: 0 12px; }
-    .play-circle {
-      width: 66px; height: 66px; border-radius: 50%; background: #ffffff; color: #030303;
-      display: grid; place-items: center; border: none; cursor: pointer;
-    }
+    .play-circle { width: 66px; height: 66px; border-radius: 50%; background: #ffffff; color: #030303; display: grid; place-items: center; border: none; cursor: pointer; }
     .fp-tabs { display: flex; border-top: 1px solid var(--border); padding-top: 12px; justify-content: space-around; }
     .fp-tab-btn { background: none; border: none; color: var(--muted); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px; cursor: pointer; padding: 6px 16px; }
-    .fp-tab-btn.active { color: #fff; border-bottom: 2px solid #fff; }
     .fp-drawer {
       display: none; position: fixed; inset: 70px 0 0 0; background: #0c0c0e;
       border-top-left-radius: 18px; border-top-right-radius: 18px; padding: 18px;
       z-index: 90; flex-direction: column;
     }
     .fp-drawer-body { flex: 1; overflow-y: auto; margin-top: 12px; white-space: pre-line; line-height: 1.75; color: #e5e5ea; font-size: 0.95rem; }
-    #yt-engine { position: fixed; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; bottom: 0; left: 0; }
     .loader { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
-  <div id="yt-engine"><div id="yt-player"></div></div>
+  <audio id="audioEngine" preload="auto"></audio>
 
   <div class="topbar">
     <div class="brand" id="brandLogo">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-      </div>
-      <span>Music</span>
+      <div class="brand-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+      <span>VIBE Music</span>
     </div>
     <div class="search-bar-wrap" id="searchWrap">
       <button class="icon-btn" onclick="closeSearch()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
       </button>
-      <input type="text" id="searchInput" class="search-input" placeholder="Cari lagu, artis, lirik..." onkeydown="if(event.key==='Enter') doSearch()" />
+      <input type="text" id="searchInput" class="search-input" placeholder="Cari lagu, artis..." onkeydown="if(event.key==='Enter') doSearch()" />
     </div>
-    <div class="top-actions" id="topActions">
+    <div id="topActions">
       <button class="icon-btn" onclick="openSearch()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
       </button>
@@ -148,20 +124,19 @@
 
   <div class="chips" id="moodChips">
     <div class="chip active" onclick="filterMood(this, '')">Semua</div>
-    <div class="chip" onclick="filterMood(this, 'lagu galau indonesia populer')">Galau & Santai</div>
-    <div class="chip" onclick="filterMood(this, 'lagu semangat olahraga workout')">Energi</div>
-    <div class="chip" onclick="filterMood(this, 'rnb chill frank ocean daniel caesar')">Chill R&B</div>
-    <div class="chip" onclick="filterMood(this, 'tiktok viral indonesia terbaru')">Viral TikTok</div>
-    <div class="chip" onclick="filterMood(this, 'tulus nadin amizah pamungkas hindia')">Indo Indie</div>
+    <div class="chip" onclick="filterMood(this, 'Tulus Nadin Amizah Hindia')">Indo Indie</div>
+    <div class="chip" onclick="filterMood(this, 'Daniel Caesar Frank Ocean Rex Orange County')">Chill R&B</div>
+    <div class="chip" onclick="filterMood(this, 'Olivia Rodrigo LANY Justin Bieber')">Global Pop</div>
+    <div class="chip" onclick="filterMood(this, 'lagu galau indonesia')">Galau</div>
   </div>
 
   <div id="viewHome">
-    <div id="homeContent"><div class="loader">Menyiapkan rekomendasi musik untukmu...</div></div>
+    <div id="homeContent"><div class="loader">Memuat katalog lagu...</div></div>
   </div>
 
   <div id="viewSearch" style="display:none;">
     <div class="section-header">
-      <span class="section-sub">KATALOG YOUTUBE MUSIC</span>
+      <span class="section-sub">KATALOG MUSIK</span>
       <span class="section-title" id="searchHeading">Hasil Pencarian</span>
     </div>
     <div class="v-list" id="searchResults"></div>
@@ -182,9 +157,7 @@
       <div class="mini-artist" id="miniArtist">Artis</div>
     </div>
     <div class="mini-controls">
-      <button class="icon-btn" onclick="togglePlay()" id="miniPlayBtn">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-      </button>
+      <button class="icon-btn" onclick="togglePlay()" id="miniPlayBtn"></button>
       <button class="icon-btn" onclick="playNext()">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
       </button>
@@ -211,14 +184,12 @@
       <button class="icon-btn" onclick="closeFullPlayer()">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
       </button>
-      <span class="fp-badge">SONG • TERMUX LIVE</span>
+      <span class="fp-badge">VIBE STREAM • ONLINE</span>
       <button class="icon-btn" onclick="openDrawer('lyrics')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14 17H4v2h10v-2zm6-8H4v2h16V9zM4 15h16v-2H4v2zM4 5v2h16V5H4z"/></svg>
       </button>
     </div>
-    <div class="fp-art-wrap">
-      <img id="fpArt" class="fp-art" src="" alt="Cover" />
-    </div>
+    <div class="fp-art-wrap"><img id="fpArt" class="fp-art" src="" alt="Cover" /></div>
     <div class="fp-meta">
       <div style="min-width:0; flex:1;">
         <div class="fp-title" id="fpTitle">Judul Lagu</div>
@@ -232,9 +203,7 @@
       <button class="icon-btn" onclick="playPrev()">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
       </button>
-      <button class="play-circle" onclick="togglePlay()" id="fpPlayBtn">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-      </button>
+      <button class="play-circle" onclick="togglePlay()" id="fpPlayBtn"></button>
       <button class="icon-btn" onclick="playNext()">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
       </button>
@@ -253,11 +222,8 @@
     <div class="fp-drawer-body" id="drawerBody"></div>
   </div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
   <script>
-    let ytPlayer = null;
-    let isPlayerReady = false;
-    let isPlaying = false;
+    const audio = document.getElementById("audioEngine");
     let queue = [];
     let currentIndex = -1;
     let likedSongs = JSON.parse(localStorage.getItem("vibe_liked") || "[]");
@@ -265,73 +231,75 @@
     const ICON_PLAY = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
     const ICON_PAUSE = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
 
-    function onYouTubeIframeAPIReady() {
-      ytPlayer = new YT.Player("yt-player", {
-        height: "1",
-        width: "1",
-        playerVars: { autoplay: 1, controls: 0, playsinline: 1 },
-        events: {
-          onReady: () => { isPlayerReady = true; },
-          onStateChange: (e) => {
-            if (e.data === YT.PlayerState.PLAYING) {
-              isPlaying = true;
-              updatePlayIcons();
-            } else if (e.data === YT.PlayerState.PAUSED) {
-              isPlaying = false;
-              updatePlayIcons();
-            } else if (e.data === YT.PlayerState.ENDED) {
-              playNext();
-            }
-          }
+    audio.addEventListener("play", updatePlayIcons);
+    audio.addEventListener("pause", updatePlayIcons);
+    audio.addEventListener("ended", playNext);
+
+    async function fetchCatalog(query, limit = 12) {
+      // Coba backend lokal/Vercel dulu, jika gagal langsung tarik via iTunes API
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && data.results.length > 0) return data.results;
         }
-      });
+      } catch {}
+
+      const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
+      const json = await itunes.json();
+      return (json.results || []).map(item => ({
+        videoId: String(item.trackId),
+        title: item.trackName,
+        artist: item.artistName,
+        album: item.collectionName || "Single",
+        duration: formatMs(item.trackTimeMillis),
+        cover: (item.artworkUrl100 || "").replace("100x100bb", "500x500bb"),
+        audioUrl: item.previewUrl
+      }));
     }
 
-    window.addEventListener("DOMContentLoaded", loadHome);
+    function formatMs(ms) {
+      const total = Math.floor((ms || 0) / 1000);
+      return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+    }
 
-    async function loadHome() {
+    window.addEventListener("DOMContentLoaded", async () => {
       const container = document.getElementById("homeContent");
       try {
-        const res = await fetch("/api/home");
-        const data = await res.json();
-        const qp = data.quick_picks || [];
-        const tr = data.trending || [];
-        const ch = data.chill || [];
+        const [qp, tr, ch] = await Promise.all([
+          fetchCatalog("Tulus Nadin Amizah Pamungkas", 12),
+          fetchCatalog("Pop Indonesia Hits", 10),
+          fetchCatalog("Daniel Caesar Frank Ocean LANY", 10)
+        ]);
         queue = [...qp, ...tr, ...ch];
 
         container.innerHTML = `
           <div class="section">
             <div class="section-header">
-              <span class="section-sub">MULAI RADIO DARI LAGU</span>
+              <span class="section-sub">PILIHAN CEPAT</span>
               <span class="section-title">Quick picks</span>
             </div>
-            <div class="quick-grid">
-              ${qp.map(t => renderSongRow(t)).join("")}
-            </div>
+            <div class="quick-grid">${qp.map(t => renderSongRow(t)).join("")}</div>
           </div>
           <div class="section">
             <div class="section-header">
-              <span class="section-sub">LAGI RAME DIPUTAR</span>
+              <span class="section-sub">LAGI POPULER</span>
               <span class="section-title">Trending Indonesia</span>
             </div>
-            <div class="cards-row">
-              ${tr.map(t => renderVCard(t)).join("")}
-            </div>
+            <div class="cards-row">${tr.map(t => renderVCard(t)).join("")}</div>
           </div>
           <div class="section">
             <div class="section-header">
-              <span class="section-sub">SANTAI & VIBE MALAM</span>
-              <span class="section-title">Chill & Indie Mix</span>
+              <span class="section-sub">SANTAI & VIBE</span>
+              <span class="section-title">Chill & R&B Mix</span>
             </div>
-            <div class="cards-row">
-              ${ch.map(t => renderVCard(t)).join("")}
-            </div>
+            <div class="cards-row">${ch.map(t => renderVCard(t)).join("")}</div>
           </div>
         `;
       } catch {
-        container.innerHTML = '<div class="loader">Server Termux belum jalan. Ketik <b>python server.py</b> di Termux.</div>';
+        container.innerHTML = '<div class="loader">Gagal memuat katalog. Periksa koneksi internetmu.</div>';
       }
-    }
+    });
 
     function renderSongRow(t) {
       const safe = encodeURIComponent(JSON.stringify(t));
@@ -360,14 +328,11 @@
     function selectTrack(encoded) {
       const track = JSON.parse(decodeURIComponent(encoded));
       let idx = queue.findIndex(x => x.videoId === track.videoId);
-      if (idx === -1) {
-        queue.unshift(track);
-        idx = 0;
-      }
+      if (idx === -1) { queue.unshift(track); idx = 0; }
       playAtIndex(idx);
     }
 
-    function playAtIndex(idx) {
+    async function playAtIndex(idx) {
       if (idx < 0 || idx >= queue.length) return;
       currentIndex = idx;
       const track = queue[idx];
@@ -382,35 +347,31 @@
       document.getElementById("fpArtist").textContent = track.artist;
       updateLikeIcon();
 
-      if (isPlayerReady && ytPlayer) {
-        ytPlayer.loadVideoById(track.videoId);
-        isPlaying = true;
-        updatePlayIcons();
+      if (track.audioUrl) {
+        audio.src = track.audioUrl;
+        audio.play();
+      } else {
+        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(track.title + " " + track.artist)}&entity=song&limit=1`);
+        const json = await res.json();
+        if (json.results && json.results[0]?.previewUrl) {
+          audio.src = json.results[0].previewUrl;
+          audio.play();
+        }
       }
     }
 
     function togglePlay() {
-      if (!isPlayerReady || !ytPlayer) return;
-      if (isPlaying) {
-        ytPlayer.pauseVideo();
-      } else {
-        ytPlayer.playVideo();
-      }
+      if (!audio.src) return;
+      audio.paused ? audio.play() : audio.pause();
     }
 
-    function playNext() {
-      if (queue.length === 0) return;
-      playAtIndex((currentIndex + 1) % queue.length);
-    }
-
-    function playPrev() {
-      if (queue.length === 0) return;
-      playAtIndex((currentIndex - 1 + queue.length) % queue.length);
-    }
+    function playNext() { if (queue.length) playAtIndex((currentIndex + 1) % queue.length); }
+    function playPrev() { if (queue.length) playAtIndex((currentIndex - 1 + queue.length) % queue.length); }
 
     function updatePlayIcons() {
-      document.getElementById("miniPlayBtn").innerHTML = isPlaying ? ICON_PAUSE : ICON_PLAY;
-      document.getElementById("fpPlayBtn").innerHTML = isPlaying ? ICON_PAUSE : ICON_PLAY;
+      const icon = audio.paused ? ICON_PLAY : ICON_PAUSE;
+      document.getElementById("miniPlayBtn").innerHTML = icon;
+      document.getElementById("fpPlayBtn").innerHTML = icon;
     }
 
     function openSearch() {
@@ -434,82 +395,56 @@
       switchTab("search");
       document.getElementById("searchHeading").textContent = `Hasil: "${q}"`;
       const box = document.getElementById("searchResults");
-      box.innerHTML = '<div class="loader">Mencari di YouTube Music...</div>';
+      box.innerHTML = '<div class="loader">Mencari lagu...</div>';
 
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        const items = data.results || [];
-        if (items.length === 0) {
-          box.innerHTML = '<div class="loader">Tidak ada hasil ditemukan.</div>';
-          return;
-        }
-        queue = items;
-        box.innerHTML = items.map(t => renderSongRow(t)).join("");
-      } catch {
-        box.innerHTML = '<div class="loader">Gagal mengambil data dari server.</div>';
+      const items = await fetchCatalog(q, 20);
+      if (!items.length) {
+        box.innerHTML = '<div class="loader">Lagu tidak ditemukan.</div>';
+        return;
       }
+      queue = items;
+      box.innerHTML = items.map(t => renderSongRow(t)).join("");
     }
 
     function filterMood(el, query) {
       document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
       el.classList.add("active");
-      if (!query) {
-        closeSearch();
-        switchTab("home");
-      } else {
-        doSearch(query);
-      }
+      if (!query) { closeSearch(); switchTab("home"); } else { doSearch(query); }
     }
 
     function switchTab(tab) {
       document.getElementById("viewHome").style.display = tab === "home" ? "block" : "none";
       document.getElementById("viewSearch").style.display = tab === "search" ? "block" : "none";
       document.getElementById("viewLibrary").style.display = tab === "library" ? "block" : "none";
-
       document.getElementById("navHome").classList.toggle("active", tab === "home");
       document.getElementById("navExplore").classList.toggle("active", tab === "search");
       document.getElementById("navLibrary").classList.toggle("active", tab === "library");
-
       if (tab === "library") renderLibrary();
     }
 
-    function openFullPlayer() {
-      document.getElementById("fullPlayer").style.display = "flex";
-    }
-
-    function closeFullPlayer() {
-      document.getElementById("fullPlayer").style.display = "none";
-      closeDrawer();
-    }
+    function openFullPlayer() { document.getElementById("fullPlayer").style.display = "flex"; }
+    function closeFullPlayer() { document.getElementById("fullPlayer").style.display = "none"; closeDrawer(); }
 
     function toggleLike() {
       if (currentIndex < 0) return;
       const track = queue[currentIndex];
-      const exists = likedSongs.findIndex(x => x.videoId === track.videoId);
-      if (exists > -1) {
-        likedSongs.splice(exists, 1);
-      } else {
-        likedSongs.unshift(track);
-      }
+      const idx = likedSongs.findIndex(x => x.videoId === track.videoId);
+      idx > -1 ? likedSongs.splice(idx, 1) : likedSongs.unshift(track);
       localStorage.setItem("vibe_liked", JSON.stringify(likedSongs));
       updateLikeIcon();
     }
 
     function updateLikeIcon() {
       if (currentIndex < 0) return;
-      const track = queue[currentIndex];
-      const isLiked = likedSongs.some(x => x.videoId === track.videoId);
+      const isLiked = likedSongs.some(x => x.videoId === queue[currentIndex].videoId);
       document.getElementById("likeBtn").style.color = isLiked ? "#FF0055" : "#ffffff";
     }
 
     function renderLibrary() {
       const box = document.getElementById("libraryList");
-      if (likedSongs.length === 0) {
-        box.innerHTML = '<div class="loader">Belum ada lagu yang disukai. Tekan ikon hati di pemutar lagu untuk menyimpan.</div>';
-        return;
-      }
-      box.innerHTML = likedSongs.map(t => renderSongRow(t)).join("");
+      box.innerHTML = likedSongs.length
+        ? likedSongs.map(t => renderSongRow(t)).join("")
+        : '<div class="loader">Belum ada lagu yang disukai.</div>';
     }
 
     async function openDrawer(type) {
@@ -529,24 +464,22 @@
             </div>
           </div>
         `).join("");
-      } else if (type === "lyrics") {
+      } else {
         title.textContent = "LIRIK LAGU";
         if (currentIndex < 0) return;
-        const vid = queue[currentIndex].videoId;
-        body.textContent = "Memuat lirik dari YouTube Music...";
+        const t = queue[currentIndex];
+        body.textContent = "Mencari lirik...";
         try {
-          const res = await fetch(`/api/lyrics/${vid}`);
+          const res = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(t.artist)}&track_name=${encodeURIComponent(t.title)}`);
           const data = await res.json();
-          body.textContent = data.lyrics;
+          body.textContent = data.plainLyrics || "Lirik tidak tersedia untuk lagu ini.";
         } catch {
-          body.textContent = "Gagal memuat lirik.";
+          body.textContent = "Lirik tidak ditemukan.";
         }
       }
     }
 
-    function closeDrawer() {
-      document.getElementById("fpDrawer").style.display = "none";
-    }
+    function closeDrawer() { document.getElementById("fpDrawer").style.display = "none"; }
   </script>
 </body>
 </html>
