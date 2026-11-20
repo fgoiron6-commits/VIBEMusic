@@ -1,15 +1,20 @@
 {
+  "id": "/",
   "name": "VIBE Music",
   "short_name": "VIBE Music",
+  "description": "Streaming musik full dan latar belakang",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#030303",
   "theme_color": "#FF0055",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
