@@ -193,14 +193,92 @@
         }
       });
     }
-    bgAudio.addEventListener("play", () => { if (activeEngine === "native") { isPlaying = true; updatePlayIcons(); if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing"; } });
-    bgAudio.addEventListener("pause", () => { if (activeEngine === "native") { isPlaying = false; updatePlayIcons(); if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused"; } });
-    bgAudio.addEventListener("ended", () => { if (activeEngine === "native") playNext(); });
+    let stuckTimer = null, lastTime = -1, stuckTicks = 0;
+
+    function armStuckGuard() {
+      clearTimeout(stuckTimer);
+      stuckTicks = 0;
+      lastTime = -1;
+      stuckTimer = setTimeout(() => {
+        if (isPlaying && activeEngine === "native" && (bgAudio.readyState < 2 || bgAudio.paused)) {
+          playNext();
+        }
+      }, 9000);
+    }
+
+    bgAudio.addEventListener("playing", () => {
+      clearTimeout(stuckTimer);
+      stuckTicks = 0;
+      if (activeEngine === "native") {
+        isPlaying = true;
+        updatePlayIcons();
+        if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+      }
+    });
+
+    bgAudio.addEventListener("play", () => {
+      if (activeEngine === "native") {
+        isPlaying = true;
+        updatePlayIcons();
+        armStuckGuard();
+        if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+      }
+    });
+
+    // Jika Android/browser menjeda paksa saat di latar belakang, paksa putar ulang otomatis
+    bgAudio.addEventListener("pause", () => {
+      if (activeEngine === "native") {
+        if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
+        if (!bgAudio.ended && isPlaying && document.hidden) {
+          setTimeout(() => { if (isPlaying && bgAudio.paused) bgAudio.play().catch(() => {}); }, 300);
+          return;
+        }
+        isPlaying = false;
+        updatePlayIcons();
+      }
+    });
+
+    // Jika stream macet (stalled/error) di latar belakang, coba muat ulang lalu lanjut lagu berikutnya
+    bgAudio.addEventListener("stalled", () => {
+      if (activeEngine === "native" && isPlaying) {
+        bgAudio.load();
+        bgAudio.play().catch(() => setTimeout(() => { if (isPlaying && bgAudio.paused) playNext(); }, 2500));
+      }
+    });
+
+    bgAudio.addEventListener("error", () => {
+      if (activeEngine === "native" && currentIndex >= 0) {
+        setTimeout(() => playNext(), 700);
+      }
+    });
+
+    bgAudio.addEventListener("ended", () => {
+      clearTimeout(stuckTimer);
+      if (activeEngine === "native") playNext();
+    });
 
     setInterval(() => {
       let cur = 0, dur = 0;
-      if (activeEngine === "native") { cur = bgAudio.currentTime || 0; dur = bgAudio.duration || 0; }
-      else if (activeEngine === "yt" && ytReady && ytPlayer?.getCurrentTime) { cur = ytPlayer.getCurrentTime() || 0; dur = ytPlayer.getDuration() || 0; }
+      if (activeEngine === "native") {
+        cur = bgAudio.currentTime || 0;
+        dur = bgAudio.duration || 0;
+        if (isPlaying && !bgAudio.paused) {
+          if (Math.abs(cur - lastTime) < 0.05) {
+            stuckTicks++;
+            if (stuckTicks >= 16) { // ~8 detik tidak bergerak sama sekali -> skip lagu bermasalah
+              stuckTicks = 0;
+              playNext();
+              return;
+            }
+          } else {
+            stuckTicks = 0;
+          }
+          lastTime = cur;
+        }
+      } else if (activeEngine === "yt" && ytReady && ytPlayer?.getCurrentTime) {
+        cur = ytPlayer.getCurrentTime() || 0;
+        dur = ytPlayer.getDuration() || 0;
+      }
       if (dur > 0) {
         const pct = (cur / dur) * 100;
         document.getElementById("seekSlider").value = pct;
