@@ -230,7 +230,7 @@
       if (track.videoId && track.videoId.length === 11) return track.videoId;
       const q = `${track.title} ${track.artist} audio`;
 
-      // 1. Coba backend /api/search
+      // 1. Backend /api/search
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
@@ -240,48 +240,35 @@
         }
       } catch {}
 
-      // 2. Pencarian langsung dari jaringan HP (Piped & Invidious Search API)
-      const pipedHosts = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.adminforge.de",
-        "https://api.piped.private.coffee",
-        "https://pipedapi.drgns.space"
+      // 2. Pencarian paralel tercepat (Piped + Invidious)
+      const endpoints = [
+        { url: `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
+        { url: `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
+        { url: `https://api.piped.private.coffee/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
+        { url: `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(q)}&type=video`, type: "inv" },
+        { url: `https://yt.artemislena.eu/api/v1/search?q=${encodeURIComponent(q)}&type=video`, type: "inv" }
       ];
-      for (const host of pipedHosts) {
-        try {
-          const ctrl = new AbortController();
-          const tmr = setTimeout(() => ctrl.abort(), 3000);
-          const r = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`, { signal: ctrl.signal });
-          clearTimeout(tmr);
-          if (r.ok) {
-            const d = await r.json();
-            const item = (d.items || []).find(i => i.url && i.url.includes("v="));
-            if (item) {
-              const vid = item.url.split("v=")[1].slice(0, 11);
-              if (vid.length === 11) return vid;
-            }
-          }
-        } catch {}
-      }
 
-      const invHosts = [
-        "https://inv.nadeko.net",
-        "https://invidious.nerdvpn.de",
-        "https://yt.artemislena.eu"
-      ];
-      for (const host of invHosts) {
-        try {
+      try {
+        const vid = await Promise.any(endpoints.map(async (ep) => {
           const ctrl = new AbortController();
-          const tmr = setTimeout(() => ctrl.abort(), 3000);
-          const r = await fetch(`${host}/api/v1/search?q=${encodeURIComponent(q)}&type=video`, { signal: ctrl.signal });
+          const tmr = setTimeout(() => ctrl.abort(), 3500);
+          const r = await fetch(ep.url, { signal: ctrl.signal });
           clearTimeout(tmr);
-          if (r.ok) {
-            const arr = await r.json();
-            const hit = (arr || []).find(v => v.videoId && v.videoId.length === 11);
-            if (hit) return hit.videoId;
+          if (!r.ok) throw new Error("fail");
+          const d = await r.json();
+          if (ep.type === "piped") {
+            const it = (d.items || []).find(i => i.url && i.url.includes("v="));
+            const id = it?.url?.split("v=")[1]?.slice(0, 11);
+            if (id && id.length === 11) return id;
+          } else {
+            const it = (d || []).find(v => v.videoId && v.videoId.length === 11);
+            if (it) return it.videoId;
           }
-        } catch {}
-      }
+          throw new Error("empty");
+        }));
+        if (vid) return vid;
+      } catch {}
       return null;
     }
 
@@ -295,28 +282,34 @@
       } catch {}
 
       if (vid) {
-        const invHosts = ["https://inv.nadeko.net", "https://invidious.nerdvpn.de", "https://yt.artemislena.eu"];
-        for (const host of invHosts) {
-          try {
+        const streamHosts = [
+          { url: `https://inv.nadeko.net/api/v1/videos/${vid}`, type: "inv" },
+          { url: `https://yt.artemislena.eu/api/v1/videos/${vid}`, type: "inv" },
+          { url: `https://pipedapi.kavin.rocks/streams/${vid}`, type: "piped" }
+        ];
+        try {
+          const stream = await Promise.any(streamHosts.map(async (sh) => {
             const ctrl = new AbortController();
             const tmr = setTimeout(() => ctrl.abort(), 3500);
-            const r = await fetch(`${host}/api/v1/videos/${vid}`, { signal: ctrl.signal });
+            const r = await fetch(sh.url, { signal: ctrl.signal });
             clearTimeout(tmr);
-            if (r.ok) {
-              const d = await r.json();
-              const aud = (d.adaptiveFormats || []).find(f => f.type?.startsWith("audio/mp4") || f.type?.startsWith("audio/webm"));
-              if (aud?.url) return { url: aud.url, label: "BACKGROUND FULL • STREAM" };
-            }
-          } catch {}
-        }
+            if (!r.ok) throw new Error("fail");
+            const d = await r.json();
+            const list = sh.type === "inv" ? (d.adaptiveFormats || []) : (d.audioStreams || []);
+            const aud = list.find(f => (f.type || f.mimeType || "").includes("audio/mp4") || (f.type || f.mimeType || "").includes("audio/webm"));
+            if (aud?.url) return { url: aud.url, label: "BACKGROUND FULL • STREAM" };
+            throw new Error("no-audio");
+          }));
+          if (stream) return stream;
+        } catch {}
       }
       return null;
     }
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden && activeEngine === "yt" && isPlaying && ytPlayer?.playVideo) {
-        setTimeout(() => ytPlayer.playVideo(), 250);
-        setTimeout(() => ytPlayer.playVideo(), 800);
+        setTimeout(() => ytPlayer.playVideo(), 200);
+        setTimeout(() => ytPlayer.playVideo(), 700);
       }
     });
 
@@ -349,6 +342,8 @@
 
     function selectTrackById(u) {
       const t = trackStore[u]; if (!t) return;
+      // Pancing izin autoplay browser tepat saat sentuhan jari pertama
+      bgAudio.play().catch(() => {});
       const k = t.videoId || t.trackId || (t.title + t.artist);
       let idx = queue.findIndex(x => (x.videoId || x.trackId || (x.title + x.artist)) === k);
       if (idx === -1) { queue.unshift(t); idx = 0; }
@@ -389,7 +384,12 @@
         return;
       }
 
-      document.getElementById("streamSourceBadge").textContent = "SERVER SIBUK • COBA LAGU LAIN";
+      if (track.previewUrl) {
+        activeEngine = "native";
+        document.getElementById("streamSourceBadge").textContent = "AUDIO CADANGAN";
+        bgAudio.src = track.previewUrl;
+        bgAudio.play().catch(() => {});
+      }
     }
 
     function togglePlay() { if (activeEngine === "native") bgAudio.paused ? bgAudio.play() : bgAudio.pause(); else if (activeEngine === "yt" && ytReady && ytPlayer) isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo(); }
