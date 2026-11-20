@@ -2,7 +2,7 @@
   "id": "/",
   "name": "VIBE Music",
   "short_name": "VIBE Music",
-  "description": "Streaming musik full dan latar belakang",
+  "description": "Aplikasi streaming musik full dan pemutar latar belakang",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,11 +10,10 @@
   "background_color": "#030303",
   "theme_color": "#FF0055",
   "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "https://cdn-icons-png.flaticon.com/512/3844/3844724.png", "sizes": "512x512", "type": "image/png", "form_factor": "narrow" }
   ]
 }
