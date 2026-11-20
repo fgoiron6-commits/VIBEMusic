@@ -1,3 +1,4 @@
+import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from ytmusicapi import YTMusic
@@ -6,7 +7,28 @@ app = Flask(__name__, static_folder="public")
 CORS(app)
 yt = YTMusic()
 
-def format_tracks(raw_list):
+def search_itunes_fallback(query, limit=15):
+    url = "https://itunes.apple.com/search"
+    params = {"term": query, "media": "music", "entity": "song", "limit": limit, "country": "ID"}
+    res = requests.get(url, params=params, timeout=8).json()
+    results = []
+    for item in res.get("results", []):
+        cover = item.get("artworkUrl100", "").replace("100x100bb", "500x500bb")
+        ms = item.get("trackTimeMillis", 0)
+        mins, secs = divmod(ms // 1000, 60)
+        # Cari videoId YouTube ringan via Piped/Invidious atau pakai previewUrl
+        results.append({
+            "videoId": str(item.get("trackId")),
+            "title": item.get("trackName", "Unknown"),
+            "artist": item.get("artistName", "Unknown Artist"),
+            "album": item.get("collectionName", "Single"),
+            "duration": f"{mins}:{secs:02d}",
+            "cover": cover,
+            "audioUrl": item.get("previewUrl", "")
+        })
+    return results
+
+def format_yt_tracks(raw_list):
     results = []
     for item in raw_list:
         video_id = item.get("videoId")
@@ -14,11 +36,7 @@ def format_tracks(raw_list):
             continue
         thumbs = item.get("thumbnails", [])
         cover = thumbs[-1]["url"] if thumbs else ""
-        # Tingkatkan resolusi thumbnail YouTube jika memungkinkan
-        if "w120-h120" in cover:
-            cover = cover.replace("w120-h120", "w544-h544")
-        elif "w60-h60" in cover:
-            cover = cover.replace("w60-h60", "w544-h544")
+        cover = cover.replace("w120-h120", "w544-h544").replace("w60-h60", "w544-h544")
         artists = ", ".join([a["name"] for a in item.get("artists", [])])
         album_obj = item.get("album")
         album = album_obj.get("name", "Single") if isinstance(album_obj, dict) else "Single"
@@ -32,47 +50,47 @@ def format_tracks(raw_list):
         })
     return results
 
+def safe_search(query, limit=15):
+    try:
+        raw = yt.search(query, filter="songs", limit=limit)
+        formatted = format_yt_tracks(raw)
+        if formatted:
+            return formatted
+    except Exception:
+        pass
+    return search_itunes_fallback(query, limit)
+
 @app.route("/")
 def index():
     return send_from_directory("public", "index.html")
 
 @app.route("/api/home")
 def home_feed():
-    try:
-        quick_picks = format_tracks(yt.search("lagu pop indonesia terbaru hits", filter="songs", limit=12))
-        trending = format_tracks(yt.search("top hits indonesia viral", filter="songs", limit=10))
-        chill = format_tracks(yt.search("Tulus Nadin Amizah Hindia Daniel Caesar", filter="songs", limit=10))
-        return jsonify({
-            "quick_picks": quick_picks,
-            "trending": trending,
-            "chill": chill
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({
+        "quick_picks": safe_search("lagu pop indonesia terbaru hits", 12),
+        "trending": safe_search("top hits indonesia viral", 10),
+        "chill": safe_search("Tulus Nadin Amizah Hindia Daniel Caesar", 10)
+    })
 
 @app.route("/api/search")
 def search():
     query = request.args.get("q", "").strip()
     if not query:
         return jsonify({"results": []})
-    try:
-        raw = yt.search(query, filter="songs", limit=20)
-        return jsonify({"results": format_tracks(raw)})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"results": safe_search(query, 20)})
 
 @app.route("/api/lyrics/<video_id>")
 def lyrics(video_id):
     try:
         watch = yt.get_watch_playlist(videoId=video_id)
         lyrics_id = watch.get("lyrics")
-        if not lyrics_id:
-            return jsonify({"lyrics": "Lirik tidak tersedia untuk lagu ini."})
-        data = yt.get_lyrics(lyrics_id)
-        return jsonify({"lyrics": data.get("lyrics", "Lirik kosong.")})
+        if lyrics_id:
+            data = yt.get_lyrics(lyrics_id)
+            if data.get("lyrics"):
+                return jsonify({"lyrics": data["lyrics"]})
     except Exception:
-        return jsonify({"lyrics": "Gagal memuat lirik."})
+        pass
+    return jsonify({"lyrics": "Lirik tidak tersedia untuk lagu ini."})
 
 if __name__ == "__main__":
-    print("YT Music Clone Server aktif di http://127.0.0.1:5000")
     app.run(host="0.0.0.0", port=5000)
