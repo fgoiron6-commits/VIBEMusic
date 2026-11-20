@@ -226,31 +226,54 @@
       return (json.results || []).map(i => ({ videoId: "", trackId: String(i.trackId), title: i.trackName, artist: i.artistName, duration: fmtSec((i.trackTimeMillis || 0) / 1000), cover: (i.artworkUrl100 || "").replace("100x100bb", "500x500bb"), previewUrl: i.previewUrl || "" }));
     }
 
-    async function resolveBackgroundStream(track) {
+    async function resolveFullVideoId(track) {
+      if (track.videoId && track.videoId.length === 11) return track.videoId;
+      const q = `${track.title} ${track.artist} official audio`;
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const hit = (data.results || []).find(x => x.videoId && x.videoId.length === 11);
+          if (hit) return hit.videoId;
+        }
+      } catch {}
+      return null;
+    }
+
+    async function resolveNativeAudio(track, vid) {
       const q = `${track.title} ${track.artist}`;
       try {
         const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=3`);
         const json = await res.json();
-        const hit = (json.data || []).find(t => t.id && t.title.toLowerCase().includes(track.title.toLowerCase().slice(0, 6))) || (json.data || [])[0];
+        const hit = (json.data || []).find(t => t.id && t.title.toLowerCase().includes(track.title.toLowerCase().slice(0, 6)));
         if (hit?.id) return { url: `https://discoveryprovider.audius.co/v1/tracks/${hit.id}/stream`, label: "BACKGROUND FULL • AUDIUS" };
       } catch {}
-      for (const host of ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de"]) {
-        try {
-          let vid = track.videoId?.length === 11 ? track.videoId : null;
-          if (!vid) {
-            const sRes = await fetch(`${host}/search?q=${encodeURIComponent(q + " official audio")}&filter=music_songs`);
-            vid = ((await sRes.json()).items || [])[0]?.url?.split("v=")[1]?.slice(0, 11);
-          }
-          if (vid) {
-            track.videoId = vid;
-            const stData = await (await fetch(`${host}/streams/${vid}`)).json();
-            const aud = (stData.audioStreams || []).find(a => a.mimeType?.includes("mp4") || a.mimeType?.includes("webm"));
-            if (aud?.url) return { url: aud.url, label: "BACKGROUND FULL • STREAM" };
-          }
-        } catch {}
+
+      if (vid) {
+        const invHosts = ["https://inv.nadeko.net", "https://invidious.nerdvpn.de", "https://yt.artemislena.eu"];
+        for (const host of invHosts) {
+          try {
+            const ctrl = new AbortController();
+            const tmr = setTimeout(() => ctrl.abort(), 3500);
+            const r = await fetch(`${host}/api/v1/videos/${vid}`, { signal: ctrl.signal });
+            clearTimeout(tmr);
+            if (r.ok) {
+              const d = await r.json();
+              const aud = (d.adaptiveFormats || []).find(f => f.type?.startsWith("audio/mp4") || f.type?.startsWith("audio/webm"));
+              if (aud?.url) return { url: aud.url, label: "BACKGROUND FULL • STREAM" };
+            }
+          } catch {}
+        }
       }
       return null;
     }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && activeEngine === "yt" && isPlaying && ytPlayer?.playVideo) {
+        setTimeout(() => ytPlayer.playVideo(), 250);
+        setTimeout(() => ytPlayer.playVideo(), 800);
+      }
+    });
 
     window.addEventListener("DOMContentLoaded", async () => {
       const container = document.getElementById("homeContent");
@@ -265,7 +288,7 @@
         const hero = qp[0] || tr[0], heroUid = registerTrack(hero);
         const topSix = [...tr.slice(0, 3), ...ch.slice(0, 3)];
         container.innerHTML = `
-          ${hero ? `<div class="hero-banner" onclick="selectTrackById('${heroUid}')"><img src="${escHtml(hero.cover)}" /><div class="hero-info"><div class="hero-tag">PILIHAN UTAMA HARI INI</div><div class="hero-title">${escHtml(hero.title)}</div><div class="hero-sub">${escHtml(hero.artist)} • Background Ready</div></div><div class="hero-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>` : ""}
+          ${hero ? `<div class="hero-banner" onclick="selectTrackById('${heroUid}')"><img src="${escHtml(hero.cover)}" /><div class="hero-info"><div class="hero-tag">PILIHAN UTAMA HARI INI</div><div class="hero-title">${escHtml(hero.title)}</div><div class="hero-sub">${escHtml(hero.artist)} • Full Song</div></div><div class="hero-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>` : ""}
           <div class="compact-grid">${topSix.map(t => { const u = registerTrack(t); return `<div class="compact-card" onclick="selectTrackById('${u}')"><img src="${escHtml(t.cover)}" /><div class="compact-title">${escHtml(t.title)}</div></div>`; }).join("")}</div>
           <div class="section"><div class="section-header"><span class="section-sub">PILIHAN CEPAT</span><span class="section-title">Quick picks</span></div><div class="quick-grid">${qp.map(t => renderSongRow(t)).join("")}</div></div>
           <div class="section"><div class="section-header"><span class="section-sub">LAGI POPULER</span><span class="section-title">Trending Indonesia</span></div><div class="cards-row">${tr.map(t => renderVCard(t)).join("")}</div></div>
@@ -297,25 +320,35 @@
       document.getElementById("fpArt").src = track.cover;
       document.getElementById("fpTitle").textContent = track.title;
       document.getElementById("fpArtist").textContent = track.artist;
-      document.getElementById("streamSourceBadge").textContent = "MENYIAPKAN BACKGROUND AUDIO...";
+      document.getElementById("streamSourceBadge").textContent = "MENCARI FULL SONG...";
       updateLikeIcon(); syncMediaSession(track);
 
-      const stream = await resolveBackgroundStream(track);
-      if (stream?.url) {
+      const vid = await resolveFullVideoId(track);
+      if (vid) track.videoId = vid;
+
+      const nativeStream = await resolveNativeAudio(track, vid);
+      if (nativeStream?.url) {
         activeEngine = "native";
         if (ytReady && ytPlayer?.stopVideo) ytPlayer.stopVideo();
-        document.getElementById("streamSourceBadge").textContent = stream.label;
-        bgAudio.src = stream.url;
+        document.getElementById("streamSourceBadge").textContent = nativeStream.label;
+        bgAudio.src = nativeStream.url;
         try { await bgAudio.play(); return; } catch {}
       }
-      if (track.videoId && ytReady && ytPlayer?.loadVideoById) {
-        activeEngine = "yt"; bgAudio.pause();
-        document.getElementById("streamSourceBadge").textContent = "FULL SONG • YOUTUBE";
-        ytPlayer.loadVideoById(track.videoId); ytPlayer.playVideo();
-      } else if (track.previewUrl) {
+
+      if (vid && ytReady && ytPlayer?.loadVideoById) {
+        activeEngine = "yt";
+        bgAudio.pause();
+        document.getElementById("streamSourceBadge").textContent = "FULL SONG • STREAM";
+        ytPlayer.loadVideoById(vid);
+        ytPlayer.playVideo();
+        return;
+      }
+
+      if (track.previewUrl) {
         activeEngine = "native";
-        document.getElementById("streamSourceBadge").textContent = "BACKGROUND PREVIEW";
-        bgAudio.src = track.previewUrl; bgAudio.play();
+        document.getElementById("streamSourceBadge").textContent = "PREVIEW 30s";
+        bgAudio.src = track.previewUrl;
+        bgAudio.play();
       }
     }
 
