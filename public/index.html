@@ -7,85 +7,136 @@
   <style>
     :root {
       --bg: #030303;
-      --surface: #121212;
-      --surface-elevated: #1d1d1d;
-      --chip-bg: rgba(255, 255, 255, 0.1);
+      --surface: #121214;
+      --surface-elevated: #1c1c21;
+      --chip-bg: rgba(255, 255, 255, 0.08);
       --text: #ffffff;
-      --muted: #aaaaaa;
+      --muted: #9e9ea8;
       --accent: #FF0055;
+      --accent-glow: rgba(255, 0, 85, 0.25);
       --border: rgba(255, 255, 255, 0.08);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background: var(--bg); color: var(--text); padding-bottom: 130px; overflow-x: hidden; }
+    body {
+      background: radial-gradient(circle at 50% -10%, #2b0918 0%, #030303 42%);
+      background-color: var(--bg);
+      color: var(--text);
+      padding-bottom: 135px;
+      overflow-x: hidden;
+    }
     .topbar {
       position: sticky; top: 0; z-index: 30;
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 16px;
-      background: linear-gradient(180deg, rgba(3,3,3,0.98) 70%, rgba(3,3,3,0.85) 100%);
-      backdrop-filter: blur(12px);
+      background: rgba(3, 3, 3, 0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
     }
-    .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.5px; }
-    .brand-icon { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.5px; }
+    .brand-icon { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; box-shadow: 0 0 14px var(--accent-glow); }
     .brand-icon svg { width: 14px; height: 14px; fill: #fff; margin-left: 2px; }
-    .icon-btn { background: none; border: none; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 4px; }
+    .icon-btn { background: none; border: none; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 5px; }
     .search-bar-wrap { display: none; align-items: center; gap: 8px; width: 100%; }
     .search-bar-wrap.active { display: flex; }
-    .search-input { flex: 1; background: var(--surface-elevated); border: none; color: #fff; padding: 9px 14px; border-radius: 99px; font-size: 0.92rem; outline: none; }
-    .chips { display: flex; gap: 8px; overflow-x: auto; padding: 6px 16px 14px; scrollbar-width: none; }
+    .search-input { flex: 1; background: var(--surface-elevated); border: 1px solid var(--border); color: #fff; padding: 9px 14px; border-radius: 99px; font-size: 0.92rem; outline: none; }
+    .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px 14px; scrollbar-width: none; }
     .chips::-webkit-scrollbar { display: none; }
-    .chip { background: var(--chip-bg); border: 1px solid var(--border); color: #fff; padding: 7px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; white-space: nowrap; cursor: pointer; }
-    .chip.active { background: #ffffff; color: #030303; font-weight: 700; }
-    .section { margin-bottom: 24px; }
-    .section-header { padding: 0 16px 12px; display: flex; flex-direction: column; }
-    .section-sub { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
-    .section-title { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.3px; }
+    .chip { background: var(--chip-bg); border: 1px solid var(--border); color: #fff; padding: 7px 14px; border-radius: 99px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #ffffff; box-shadow: 0 4px 12px var(--accent-glow); }
+
+    /* Hero Banner */
+    .hero-banner {
+      margin: 0 16px 20px; padding: 16px; border-radius: 16px;
+      background: linear-gradient(135deg, #2b0b19 0%, #141419 100%);
+      border: 1px solid rgba(255, 0, 85, 0.25);
+      display: flex; align-items: center; gap: 14px; cursor: pointer;
+    }
+    .hero-banner img { width: 78px; height: 78px; border-radius: 12px; object-fit: cover; box-shadow: 0 8px 20px rgba(0,0,0,0.6); flex-shrink: 0; }
+    .hero-info { flex: 1; min-width: 0; }
+    .hero-tag { font-size: 0.68rem; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .hero-title { font-size: 1.08rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hero-sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hero-play { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; flex-shrink: 0; box-shadow: 0 4px 14px var(--accent-glow); }
+
+    /* Compact 2-Column Grid */
+    .compact-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 0 16px; margin-bottom: 24px; }
+    .compact-card {
+      background: var(--surface-elevated); border-radius: 8px; overflow: hidden;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .compact-card img { width: 48px; height: 48px; object-fit: cover; flex-shrink: 0; }
+    .compact-title { font-size: 0.78rem; font-weight: 700; padding-right: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; }
+
+    .section { margin-bottom: 26px; }
+    .section-header { padding: 0 16px 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .section-sub { font-size: 0.68rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 2px; display: block; }
+    .section-title { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.3px; }
+
+    /* Horizontal Quick Picks */
     .quick-grid {
       display: grid; grid-auto-flow: column; grid-template-rows: repeat(4, 1fr);
-      grid-auto-columns: 84%; gap: 10px 14px;
+      grid-auto-columns: 82%; gap: 10px 14px;
       overflow-x: auto; padding: 0 16px; scroll-snap-type: x mandatory; scrollbar-width: none;
     }
     .quick-grid::-webkit-scrollbar { display: none; }
-    .song-row { display: flex; align-items: center; gap: 12px; scroll-snap-align: start; padding: 4px; border-radius: 8px; cursor: pointer; }
+
+    /* Vertical Track Rows */
+    .song-row {
+      display: flex; align-items: center; gap: 12px; scroll-snap-align: start;
+      padding: 6px 8px; border-radius: 10px; cursor: pointer;
+      transition: background 0.15s;
+    }
     .song-row:active { background: var(--surface-elevated); }
-    .song-row img { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; background: #1e1e1e; flex-shrink: 0; }
+    .track-num { width: 22px; text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+    .song-row img { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #1e1e1e; flex-shrink: 0; }
     .song-meta { flex: 1; min-width: 0; }
     .song-title { font-size: 0.92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .song-title.playing-text { color: var(--accent); }
-    .song-artist { font-size: 0.8rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .song-artist { font-size: 0.78rem; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .song-dur { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; }
+
+    /* Horizontal Cards */
     .cards-row { display: flex; gap: 14px; overflow-x: auto; padding: 0 16px; scrollbar-width: none; }
     .cards-row::-webkit-scrollbar { display: none; }
-    .v-card { width: 140px; flex-shrink: 0; cursor: pointer; }
-    .v-card img { width: 140px; height: 140px; border-radius: 8px; object-fit: cover; background: #1e1e1e; margin-bottom: 8px; }
-    .v-card-title { font-size: 0.86rem; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
-    .v-card-sub { font-size: 0.76rem; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .v-list { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+    .v-card { width: 138px; flex-shrink: 0; cursor: pointer; }
+    .v-card img { width: 138px; height: 138px; border-radius: 10px; object-fit: cover; background: #1e1e1e; margin-bottom: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+    .v-card-title { font-size: 0.85rem; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
+    .v-card-sub { font-size: 0.75rem; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .v-list { padding: 0 12px; display: flex; flex-direction: column; gap: 4px; }
+
+    /* Mini & Full Player */
     .mini-player {
-      position: fixed; bottom: 56px; left: 0; right: 0; height: 60px;
-      background: #1b1b1f; border-top: 1px solid var(--border);
+      position: fixed; bottom: 56px; left: 8px; right: 8px; height: 60px;
+      background: #1c1c22; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
       display: none; align-items: center; padding: 0 12px; gap: 12px; z-index: 40;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.8); overflow: hidden;
     }
-    .mini-progress-bar { position: absolute; top: 0; left: 0; height: 2px; background: var(--accent); width: 0%; transition: width 0.25s linear; }
-    .mini-player img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; }
+    .mini-progress-bar { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--accent); width: 0%; transition: width 0.25s linear; }
+    .mini-player img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
     .mini-info { flex: 1; min-width: 0; cursor: pointer; }
     .mini-title { font-size: 0.88rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mini-artist { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mini-controls { display: flex; align-items: center; gap: 10px; }
+    .mini-artist { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mini-controls { display: flex; align-items: center; gap: 8px; }
+
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0; height: 56px;
-      background: #0a0a0a; border-top: 1px solid var(--border);
+      background: rgba(8, 8, 10, 0.96); border-top: 1px solid var(--border);
       display: flex; justify-content: space-around; align-items: center; z-index: 45;
     }
     .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: 0.68rem; background: none; border: none; cursor: pointer; }
-    .nav-item.active { color: #ffffff; font-weight: 700; }
+    .nav-item.active { color: var(--accent); font-weight: 700; }
     .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+
     .full-player {
-      position: fixed; inset: 0; background: linear-gradient(180deg, #1f1419 0%, #030303 55%);
+      position: fixed; inset: 0; background: linear-gradient(180deg, #2a0a18 0%, #030303 60%);
       z-index: 80; display: none; flex-direction: column; padding: 16px 22px 24px;
     }
     .fp-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .fp-badge { font-size: 0.72rem; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 99px; font-weight: 600; }
+    .fp-badge { font-size: 0.72rem; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 99px; font-weight: 700; }
     .fp-art-wrap { flex: 1; display: grid; place-items: center; max-height: 290px; margin: 4px 0 14px; }
-    .fp-art { width: 255px; height: 255px; border-radius: 14px; object-fit: cover; box-shadow: 0 20px 50px rgba(0,0,0,0.75); }
+    .fp-art { width: 255px; height: 255px; border-radius: 16px; object-fit: cover; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
     .fp-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
     .fp-title { font-size: 1.3rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .fp-artist { font-size: 0.92rem; color: var(--muted); margin-top: 4px; }
@@ -93,7 +144,7 @@
     .seek-slider { width: 100%; accent-color: var(--accent); height: 4px; cursor: pointer; }
     .time-row { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
     .fp-controls { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 18px; padding: 0 12px; }
-    .play-circle { width: 64px; height: 64px; border-radius: 50%; background: #ffffff; color: #030303; display: grid; place-items: center; border: none; cursor: pointer; }
+    .play-circle { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #ffffff; display: grid; place-items: center; border: none; cursor: pointer; box-shadow: 0 6px 20px var(--accent-glow); }
     .fp-tabs { display: flex; border-top: 1px solid var(--border); padding-top: 10px; justify-content: space-around; }
     .fp-tab-btn { background: none; border: none; color: var(--muted); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px; cursor: pointer; padding: 6px 16px; }
     .fp-drawer {
@@ -129,20 +180,21 @@
   </div>
 
   <div class="chips" id="moodChips">
-    <div class="chip active" onclick="filterMood(this, '')">Semua</div>
+    <div class="chip active" onclick="filterMood(this, '')">Untukmu</div>
     <div class="chip" onclick="filterMood(this, 'Tulus Nadin Amizah Hindia')">Indo Indie</div>
     <div class="chip" onclick="filterMood(this, 'Daniel Caesar Frank Ocean Rex Orange County')">Chill R&B</div>
     <div class="chip" onclick="filterMood(this, 'Olivia Rodrigo LANY Justin Bieber')">Global Pop</div>
-    <div class="chip" onclick="filterMood(this, 'lagu galau indonesia')">Galau</div>
+    <div class="chip" onclick="filterMood(this, 'lagu galau indonesia viral')">Galau Viral</div>
+    <div class="chip" onclick="filterMood(this, 'Pamungkas Feby Putri Sal Priadi')">Akustik</div>
   </div>
 
-  <div id="viewHome"><div id="homeContent"><div class="loader">Memuat katalog lagu full...</div></div></div>
+  <div id="viewHome"><div id="homeContent"><div class="loader">Menyiapkan deretan lagu pilihanmu...</div></div></div>
   <div id="viewSearch" style="display:none;">
-    <div class="section-header"><span class="section-sub">FULL TRACK CATALOG</span><span class="section-title" id="searchHeading">Hasil Pencarian</span></div>
+    <div class="section-header"><div><span class="section-sub">FULL TRACK CATALOG</span><span class="section-title" id="searchHeading">Hasil Pencarian</span></div></div>
     <div class="v-list" id="searchResults"></div>
   </div>
   <div id="viewLibrary" style="display:none;">
-    <div class="section-header"><span class="section-sub">KOLEKSI TERSIMPAN</span><span class="section-title">Lagu Disukai</span></div>
+    <div class="section-header"><div><span class="section-sub">KOLEKSI TERSIMPAN</span><span class="section-title">Lagu Disukai</span></div></div>
     <div class="v-list" id="libraryList"></div>
   </div>
 
@@ -206,15 +258,9 @@
 
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
-    let ytPlayer = null;
-    let ytReady = false;
-    let activeEngine = "yt";
+    let ytPlayer = null, ytReady = false, activeEngine = "yt";
     const audiusAudio = document.getElementById("audiusEngine");
-
-    let trackStore = {}; // Kamus aman anti-kutip untuk semua item lagu
-    let queue = [];
-    let currentIndex = -1;
-    let isPlaying = false;
+    let trackStore = {}, queue = [], currentIndex = -1, isPlaying = false;
     let likedSongs = JSON.parse(localStorage.getItem("vibe_liked") || "[]");
 
     const ICON_PLAY = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
@@ -225,11 +271,9 @@
       trackStore[uid] = t;
       return uid;
     }
-
     function escHtml(str) {
       return String(str || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
     }
-
     function onYouTubeIframeAPIReady() {
       ytPlayer = new YT.Player("ytPlayer", {
         height: "1", width: "1",
@@ -242,13 +286,10 @@
             if (e.data === YT.PlayerState.PAUSED) { isPlaying = false; updatePlayIcons(); }
             if (e.data === YT.PlayerState.ENDED) { playNext(); }
           },
-          onError: () => {
-            if (currentIndex >= 0) playViaAudius(queue[currentIndex]);
-          }
+          onError: () => { if (currentIndex >= 0) playViaAudius(queue[currentIndex]); }
         }
       });
     }
-
     audiusAudio.addEventListener("play", () => { if (activeEngine === "audius") { isPlaying = true; updatePlayIcons(); } });
     audiusAudio.addEventListener("pause", () => { if (activeEngine === "audius") { isPlaying = false; updatePlayIcons(); } });
     audiusAudio.addEventListener("ended", () => { if (activeEngine === "audius") playNext(); });
@@ -256,11 +297,9 @@
     setInterval(() => {
       let cur = 0, dur = 0;
       if (activeEngine === "yt" && ytReady && ytPlayer && ytPlayer.getCurrentTime) {
-        cur = ytPlayer.getCurrentTime() || 0;
-        dur = ytPlayer.getDuration() || 0;
+        cur = ytPlayer.getCurrentTime() || 0; dur = ytPlayer.getDuration() || 0;
       } else if (activeEngine === "audius") {
-        cur = audiusAudio.currentTime || 0;
-        dur = audiusAudio.duration || 0;
+        cur = audiusAudio.currentTime || 0; dur = audiusAudio.duration || 0;
       }
       if (dur > 0) {
         const pct = (cur / dur) * 100;
@@ -272,20 +311,15 @@
     }, 500);
 
     function fmtSec(s) {
-      const m = Math.floor(s / 60);
-      const sec = Math.floor(s % 60);
+      const m = Math.floor(s / 60), sec = Math.floor(s % 60);
       return `${m}:${String(sec).padStart(2, "0")}`;
     }
-
     function seekTo(pct) {
-      if (activeEngine === "yt" && ytReady && ytPlayer && ytPlayer.getDuration) {
-        ytPlayer.seekTo((pct / 100) * ytPlayer.getDuration(), true);
-      } else if (activeEngine === "audius" && audiusAudio.duration) {
-        audiusAudio.currentTime = (pct / 100) * audiusAudio.duration;
-      }
+      if (activeEngine === "yt" && ytReady && ytPlayer && ytPlayer.getDuration) ytPlayer.seekTo((pct / 100) * ytPlayer.getDuration(), true);
+      else if (activeEngine === "audius" && audiusAudio.duration) audiusAudio.currentTime = (pct / 100) * audiusAudio.duration;
     }
 
-    async function fetchCatalog(query, limit = 12) {
+    async function fetchCatalog(query, limit = 15) {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
         if (res.ok) {
@@ -295,18 +329,13 @@
           }
         }
       } catch {}
-
       const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
       const json = await itunes.json();
       return (json.results || []).map(item => ({
-        videoId: "",
-        trackId: String(item.trackId),
-        title: item.trackName,
-        artist: item.artistName,
+        videoId: "", trackId: String(item.trackId), title: item.trackName, artist: item.artistName,
         duration: fmtSec((item.trackTimeMillis || 0) / 1000),
         cover: (item.artworkUrl100 || "").replace("100x100bb", "500x500bb"),
-        previewUrl: item.previewUrl || "",
-        source: "resolve"
+        previewUrl: item.previewUrl || "", source: "resolve"
       }));
     }
 
@@ -320,14 +349,13 @@
           if (hit) return hit.videoId;
         }
       } catch {}
-
       const instances = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de", "https://api.piped.private.coffee"];
       for (const host of instances) {
         try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 3500);
-          const res = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`, { signal: controller.signal });
-          clearTimeout(timer);
+          const ctrl = new AbortController();
+          const tmr = setTimeout(() => ctrl.abort(), 3500);
+          const res = await fetch(`${host}/search?q=${encodeURIComponent(q)}&filter=music_songs`, { signal: ctrl.signal });
+          clearTimeout(tmr);
           const data = await res.json();
           const item = (data.items || [])[0];
           if (item && item.url) {
@@ -353,7 +381,6 @@
           return;
         }
       } catch {}
-      // Cadangan terakhir jika Audius kosong: previewUrl
       if (track.previewUrl) {
         document.getElementById("streamSourceBadge").textContent = "PREVIEW AUDIO";
         audiusAudio.src = track.previewUrl;
@@ -364,24 +391,54 @@
     window.addEventListener("DOMContentLoaded", async () => {
       const container = document.getElementById("homeContent");
       try {
-        const [qp, tr, ch] = await Promise.all([
-          fetchCatalog("Tulus Nadin Amizah Pamungkas", 12),
-          fetchCatalog("Pop Indonesia Hits", 10),
-          fetchCatalog("Daniel Caesar Frank Ocean LANY", 10)
+        const [qp, tr, ch, extra] = await Promise.all([
+          fetchCatalog("Tulus Nadin Amizah Hindia", 12),
+          fetchCatalog("Top Hits Indonesia 2026", 12),
+          fetchCatalog("Daniel Caesar Frank Ocean LANY", 12),
+          fetchCatalog("Pamungkas Sal Priadi Olivia Rodrigo", 25)
         ]);
-        queue = [...qp, ...tr, ...ch];
+        queue = [...qp, ...tr, ...ch, ...extra];
+        const hero = qp[0] || tr[0];
+        const heroUid = registerTrack(hero);
+        const topSix = [...tr.slice(0, 3), ...ch.slice(0, 3)];
+
         container.innerHTML = `
+          ${hero ? `
+          <div class="hero-banner" onclick="selectTrackById('${heroUid}')">
+            <img src="${escHtml(hero.cover)}" />
+            <div class="hero-info">
+              <div class="hero-tag">PILIHAN UTAMA HARI INI</div>
+              <div class="hero-title">${escHtml(hero.title)}</div>
+              <div class="hero-sub">${escHtml(hero.artist)} • Putar Penuh</div>
+            </div>
+            <div class="hero-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+          </div>` : ""}
+
+          <div class="compact-grid">
+            ${topSix.map(t => {
+              const uid = registerTrack(t);
+              return `<div class="compact-card" onclick="selectTrackById('${uid}')"><img src="${escHtml(t.cover)}" /><div class="compact-title">${escHtml(t.title)}</div></div>`;
+            }).join("")}
+          </div>
+
           <div class="section">
-            <div class="section-header"><span class="section-sub">PILIHAN CEPAT (FULL)</span><span class="section-title">Quick picks</span></div>
+            <div class="section-header"><div><span class="section-sub">PILIHAN CEPAT</span><span class="section-title">Quick picks</span></div></div>
             <div class="quick-grid">${qp.map(t => renderSongRow(t)).join("")}</div>
           </div>
+
           <div class="section">
-            <div class="section-header"><span class="section-sub">LAGI POPULER</span><span class="section-title">Trending Indonesia</span></div>
+            <div class="section-header"><div><span class="section-sub">LAGI POPULER</span><span class="section-title">Trending Indonesia</span></div></div>
             <div class="cards-row">${tr.map(t => renderVCard(t)).join("")}</div>
           </div>
+
           <div class="section">
-            <div class="section-header"><span class="section-sub">SANTAI & VIBE</span><span class="section-title">Chill & R&B Mix</span></div>
+            <div class="section-header"><div><span class="section-sub">SANTAI & VIBE</span><span class="section-title">Chill & R&B Mix</span></div></div>
             <div class="cards-row">${ch.map(t => renderVCard(t)).join("")}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-header"><div><span class="section-sub">DERETAN LAGU LENGKAP</span><span class="section-title">Rekomendasi Untukmu</span></div></div>
+            <div class="v-list">${extra.map((t, idx) => renderNumberedRow(t, idx + 1)).join("")}</div>
           </div>
         `;
       } catch {
@@ -396,8 +453,24 @@
           <img src="${escHtml(t.cover)}" loading="lazy" />
           <div class="song-meta">
             <div class="song-title">${escHtml(t.title)}</div>
-            <div class="song-artist">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
+            <div class="song-artist">${escHtml(t.artist)}</div>
           </div>
+          <span class="song-dur">${escHtml(t.duration)}</span>
+        </div>
+      `;
+    }
+
+    function renderNumberedRow(t, num) {
+      const uid = registerTrack(t);
+      return `
+        <div class="song-row" onclick="selectTrackById('${uid}')">
+          <span class="track-num">${num}</span>
+          <img src="${escHtml(t.cover)}" loading="lazy" />
+          <div class="song-meta">
+            <div class="song-title">${escHtml(t.title)}</div>
+            <div class="song-artist">${escHtml(t.artist)}</div>
+          </div>
+          <span class="song-dur">${escHtml(t.duration)}</span>
         </div>
       `;
     }
@@ -418,10 +491,7 @@
       if (!track) return;
       const key = track.videoId || track.trackId || (track.title + track.artist);
       let idx = queue.findIndex(x => (x.videoId || x.trackId || (x.title + x.artist)) === key);
-      if (idx === -1) {
-        queue.unshift(track);
-        idx = 0;
-      }
+      if (idx === -1) { queue.unshift(track); idx = 0; }
       playAtIndex(idx);
     }
 
@@ -459,16 +529,11 @@
     }
 
     function togglePlay() {
-      if (activeEngine === "yt" && ytReady && ytPlayer) {
-        isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
-      } else if (activeEngine === "audius") {
-        audiusAudio.paused ? audiusAudio.play() : audiusAudio.pause();
-      }
+      if (activeEngine === "yt" && ytReady && ytPlayer) isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
+      else if (activeEngine === "audius") audiusAudio.paused ? audiusAudio.play() : audiusAudio.pause();
     }
-
     function playNext() { if (queue.length) playAtIndex((currentIndex + 1) % queue.length); }
     function playPrev() { if (queue.length) playAtIndex((currentIndex - 1 + queue.length) % queue.length); }
-
     function updatePlayIcons() {
       const icon = isPlaying ? ICON_PAUSE : ICON_PLAY;
       document.getElementById("miniPlayBtn").innerHTML = icon;
@@ -482,14 +547,12 @@
       document.getElementById("searchInput").focus();
       switchTab("search");
     }
-
     function closeSearch() {
       document.getElementById("brandLogo").style.display = "flex";
       document.getElementById("topActions").style.display = "flex";
       document.getElementById("searchWrap").classList.remove("active");
       switchTab("home");
     }
-
     async function doSearch(customQuery) {
       const q = customQuery || document.getElementById("searchInput").value.trim();
       if (!q) return;
@@ -498,20 +561,18 @@
       const box = document.getElementById("searchResults");
       box.innerHTML = '<div class="loader">Mencari lagu full...</div>';
       try {
-        const items = await fetchCatalog(q, 20);
+        const items = await fetchCatalog(q, 25);
         if (!items.length) { box.innerHTML = '<div class="loader">Lagu tidak ditemukan.</div>'; return; }
-        box.innerHTML = items.map(t => renderSongRow(t)).join("");
+        box.innerHTML = items.map((t, i) => renderNumberedRow(t, i + 1)).join("");
       } catch {
         box.innerHTML = '<div class="loader">Gagal mencari lagu. Coba lagi.</div>';
       }
     }
-
     function filterMood(el, query) {
       document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
       el.classList.add("active");
       if (!query) { closeSearch(); switchTab("home"); } else { doSearch(query); }
     }
-
     function switchTab(tab) {
       document.getElementById("viewHome").style.display = tab === "home" ? "block" : "none";
       document.getElementById("viewSearch").style.display = tab === "search" ? "block" : "none";
@@ -521,10 +582,8 @@
       document.getElementById("navLibrary").classList.toggle("active", tab === "library");
       if (tab === "library") renderLibrary();
     }
-
     function openFullPlayer() { document.getElementById("fullPlayer").style.display = "flex"; }
     function closeFullPlayer() { document.getElementById("fullPlayer").style.display = "none"; closeDrawer(); }
-
     function toggleLike() {
       if (currentIndex < 0) return;
       const track = queue[currentIndex];
@@ -534,7 +593,6 @@
       localStorage.setItem("vibe_liked", JSON.stringify(likedSongs));
       updateLikeIcon();
     }
-
     function updateLikeIcon() {
       if (currentIndex < 0) return;
       const track = queue[currentIndex];
@@ -542,22 +600,19 @@
       const isLiked = likedSongs.some(x => (x.videoId || x.trackId || (x.title + x.artist)) === key);
       document.getElementById("likeBtn").style.color = isLiked ? "#FF0055" : "#ffffff";
     }
-
     function renderLibrary() {
       const box = document.getElementById("libraryList");
-      box.innerHTML = likedSongs.length ? likedSongs.map(t => renderSongRow(t)).join("") : '<div class="loader">Belum ada lagu yang disukai.</div>';
+      box.innerHTML = likedSongs.length ? likedSongs.map((t, i) => renderNumberedRow(t, i + 1)).join("") : '<div class="loader">Belum ada lagu yang disukai.</div>';
     }
-
     async function openDrawer(type) {
       const drawer = document.getElementById("fpDrawer");
       const title = document.getElementById("drawerTitle");
       const body = document.getElementById("drawerBody");
       drawer.style.display = "flex";
-
       if (type === "queue") {
         title.textContent = "UP NEXT (ANTREAN)";
         body.innerHTML = queue.map((t, i) => `
-          <div class="song-row" onclick="playAtIndex(${i}); closeDrawer();" style="margin-bottom:8px;">
+          <div class="song-row" onclick="playAtIndex(${i}); closeDrawer();" style="margin-bottom:6px;">
             <img src="${escHtml(t.cover)}" />
             <div class="song-meta">
               <div class="song-title ${i === currentIndex ? 'playing-text' : ''}">${escHtml(t.title)}</div>
@@ -577,7 +632,6 @@
         } catch { body.textContent = "Lirik tidak ditemukan."; }
       }
     }
-
     function closeDrawer() { document.getElementById("fpDrawer").style.display = "none"; }
   </script>
 </body>
