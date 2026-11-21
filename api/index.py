@@ -106,75 +106,32 @@ def search():
     if not q:
         return jsonify({"results": []})
 
-    results = []
-    seen = set()
-
-    # 1. Utamakan ytmusicapi TANPA diacak agar hasil teratas paling akurat
     if yt:
         try:
             raw = yt.search(q, filter="songs", limit=limit)
+            parsed = []
             for s in raw:
                 vid = s.get("videoId")
-                title = s.get("title")
-                if not vid or len(vid) != 11 or not title:
+                if not vid or len(vid) != 11:
                     continue
                 artists = ", ".join([a.get("name", "") for a in (s.get("artists") or []) if a.get("name")]) or "Unknown Artist"
-                key = f"{title.lower()}::{artists.lower()}"
-                if key in seen:
-                    continue
-                seen.add(key)
                 thumbs = s.get("thumbnails") or []
                 cover = thumbs[-1].get("url", "") if thumbs else ""
-                results.append({
+                parsed.append({
                     "videoId": vid,
                     "trackId": vid,
-                    "title": title,
+                    "title": s.get("title", "Unknown"),
                     "artist": artists,
                     "duration": s.get("duration") or "3:30",
                     "cover": cover
                 })
+            if parsed:
+                random.shuffle(parsed)
+                return jsonify({"source": "ytmusicapi", "results": parsed})
         except Exception:
             pass
 
-    # 2. Lengkapi dengan iTunes Metadata (untuk artis major seperti Daniel Caesar, dll) - TANPA previewUrl
-    if len(results) < limit:
-        try:
-            ir = requests.get(
-                "https://itunes.apple.com/search",
-                params={"term": q, "media": "music", "entity": "song", "limit": limit, "country": "ID"},
-                timeout=3.2
-            )
-            if ir.ok:
-                for item in ir.json().get("results", []):
-                    title = item.get("trackName")
-                    artist = item.get("artistName")
-                    if not title or not artist:
-                        continue
-                    key = f"{title.lower()}::{artist.lower()}"
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    ms = int(item.get("trackTimeMillis") or 210000) // 1000
-                    results.append({
-                        "videoId": "",
-                        "trackId": f"it_{item.get('trackId', '')}",
-                        "title": title,
-                        "artist": artist,
-                        "duration": f"{ms // 60}:{ms % 60:02d}",
-                        "cover": (item.get("artworkUrl100") or "").replace("100x100bb", "500x500bb")
-                    })
-        except Exception:
-            pass
-
-    # 3. Tambah Audius jika masih kurang
-    if len(results) < limit:
-        for a in search_audius_tracks(q, limit - len(results)):
-            key = f"{a['title'].lower()}::{a['artist'].lower()}"
-            if key not in seen:
-                seen.add(key)
-                results.append(a)
-
-    return jsonify({"source": "unified-search", "results": results[:limit]})
+    return jsonify({"source": "full-fallback", "results": full_catalog_fallback(q, limit)})
 
 @app.route("/api/resolve")
 def resolve_full_track():
