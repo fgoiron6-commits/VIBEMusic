@@ -177,5 +177,40 @@ def related():
 
     return jsonify({"source": "fallback", "results": fallback_catalog(q or "indie pop mix", 15)})
 
+
+@app.route("/api/spotify")
+def spotify_search():
+    q = (request.args.get("q") or "").strip()
+    limit = int(request.args.get("limit") or 15)
+    if not q:
+        return jsonify({"results": []})
+    try:
+        from spotapi import Public
+        raw = Public.song_search(q)
+        items = (((raw or {}).get("data") or {}).get("searchV2") or {}).get("tracksV2", {}).get("items", [])
+        parsed = []
+        for it in items[:limit]:
+            d = (it.get("item") or {}).get("data") or {}
+            name = d.get("name")
+            if not name:
+                continue
+            artists = ", ".join([a.get("profile", {}).get("name", "") for a in ((d.get("artists") or {}).get("items") or []) if a.get("profile", {}).get("name")])
+            covers = (((d.get("albumOfTrack") or {}).get("coverArt") or {}).get("sources") or [])
+            cover = covers[0].get("url", "") if covers else ""
+            ms = int(((d.get("duration") or {}).get("totalMilliseconds")) or 210000) // 1000
+            parsed.append({
+                "videoId": "",
+                "trackId": str(d.get("id", "")),
+                "title": name,
+                "artist": artists or "Unknown Artist",
+                "duration": f"{ms // 60}:{ms % 60:02d}",
+                "cover": cover
+            })
+        if parsed:
+            return jsonify({"source": "spotapi", "results": parsed})
+    except Exception:
+        pass
+    return jsonify({"source": "fallback", "results": fallback_catalog(q, limit)})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
