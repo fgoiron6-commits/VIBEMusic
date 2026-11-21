@@ -154,11 +154,17 @@
     </div>
     <div class="seek-wrap"><input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" oninput="seekTo(this.value)" /><div class="time-row"><span id="curTime">0:00</span><span id="durTime">0:00</span></div></div>
     <div class="fp-controls">
-      <button class="icon-btn" onclick="playPrev()"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+      <button class="icon-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Acak"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+      <button class="icon-btn" onclick="playPrev()"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
       <button class="play-circle" onclick="togglePlay()" id="fpPlayBtn"></button>
-      <button class="icon-btn" onclick="playNext()"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+      <button class="icon-btn" onclick="playNext()"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+      <button class="icon-btn" id="repeatBtn" onclick="toggleRepeat()" title="Ulangi"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
     </div>
-    <div class="fp-tabs"><button class="fp-tab-btn" onclick="openDrawer('queue')">UP NEXT</button><button class="fp-tab-btn" onclick="openDrawer('lyrics')">LYRICS</button></div>
+    <div class="fp-tabs">
+      <button class="fp-tab-btn" onclick="openDrawer('queue')">BERIKUTNYA</button>
+      <button class="fp-tab-btn" onclick="openDrawer('lyrics')">LIRIK</button>
+      <button class="fp-tab-btn" onclick="openDrawer('related')">TERKAIT</button>
+    </div>
   </div>
 
   <div class="fp-drawer" id="fpDrawer">
@@ -394,6 +400,8 @@
       }
     });
 
+    let isShuffle = true, repeatMode = 0; // 0: off, 1: repeat queue, 2: repeat one
+
     function shuffleArr(arr) {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -403,33 +411,71 @@
       return a;
     }
 
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      document.getElementById("shuffleBtn").style.color = isShuffle ? "#FF0055" : "#9e9ea8";
+      if (isShuffle && queue.length > 1) {
+        const cur = queue[currentIndex];
+        const rest = shuffleArr(queue.filter((_, i) => i !== currentIndex));
+        queue = cur ? [cur, ...rest] : rest;
+        currentIndex = cur ? 0 : -1;
+      }
+    }
+
+    function toggleRepeat() {
+      repeatMode = (repeatMode + 1) % 3;
+      const el = document.getElementById("repeatBtn");
+      el.style.color = repeatMode > 0 ? "#FF0055" : "#9e9ea8";
+    }
+
     function playMixAll(startIdx = 0) {
       if (!queue.length) return;
       playAtIndex(startIdx);
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
+      document.getElementById("shuffleBtn").style.color = "#FF0055";
       const container = document.getElementById("homeContent");
+
+      const poolQueries = shuffleArr([
+        "Jess Benko Bleachers NIKI Daniel Caesar",
+        "Arctic Monkeys Dua Lipa Coldplay Billie Eilish",
+        "The 1975 Clairo beabadoobee Alec Benjamin",
+        "Tame Impala Glass Animals Stromae Lorde",
+        "Frank Ocean Rex Orange County Bruno Mars Olivia Rodrigo",
+        "Tulus Nadin Amizah Hindia Sal Priadi",
+        "girl in red Phoebe Bridgers Novo Amor mxmtoon",
+        "LANY Sasha Alex Sloan Jeremy Zucker Chelsea Cutler"
+      ]);
+
       try {
-        const [euroMix, randMix, shortcuts, moreTracks] = await Promise.all([
-          fetchCatalog("Arctic Monkeys Dua Lipa Coldplay Billie Eilish", 12),
-          fetchCatalog("Daniel Caesar NIKI Bleachers Tulus", 12),
-          fetchCatalog("Lorde Glass Animals Tame Impala Olivia Rodrigo", 12),
-          fetchCatalog("European Indie Pop Hits Stromae Disclosure", 25)
+        const [b1, b2, b3, b4] = await Promise.all([
+          fetchCatalog(poolQueries[0], 18),
+          fetchCatalog(poolQueries[1], 18),
+          fetchCatalog(poolQueries[2], 18),
+          fetchCatalog(poolQueries[3], 22)
         ]);
 
-        const mixList = shuffleArr([...euroMix.slice(0, 6), ...randMix.slice(0, 6)]);
-        const shortcutList = shuffleArr(shortcuts).slice(0, 9);
-        const scrollList = shuffleArr([...euroMix.slice(4), ...randMix.slice(4), ...moreTracks]);
+        const combined = shuffleArr([...b1, ...b2, ...b3, ...b4]);
+        const uniqueMap = new Map();
+        for (const t of combined) {
+          const key = `${(t.title || "").toLowerCase()}-${(t.artist || "").toLowerCase()}`;
+          if (!uniqueMap.has(key)) uniqueMap.set(key, t);
+        }
+        const uniqueTracks = shuffleArr([...uniqueMap.values()]);
 
-        queue = [...mixList, ...scrollList, ...shortcutList];
-        const firstMixIdx = 0;
+        const mixList = uniqueTracks.slice(0, 8);
+        const shortcutList = uniqueTracks.slice(8, 17);
+        const euroMix = shuffleArr(b2).slice(0, 10);
+        const scrollList = uniqueTracks.slice(17, 52);
+
+        queue = [...mixList, ...scrollList, ...shortcutList, ...euroMix];
 
         container.innerHTML = `
           <div class="section">
             <div class="sec-row-head">
               <span class="section-title">Mix lagu</span>
-              <button class="play-all-btn" onclick="playMixAll(${firstMixIdx})">Putar semua</button>
+              <button class="play-all-btn" onclick="playMixAll(0)">Putar semua</button>
             </div>
             <div class="quick-grid">${mixList.map(t => renderMixRow(t)).join("")}</div>
           </div>
@@ -506,13 +552,22 @@
         try { await bgAudio.play(); return; } catch {}
       }
 
-      // Jika stream audio tidak tersedia, langsung lanjut ke lagu berikutnya agar tidak macet
       document.getElementById("streamSourceBadge").textContent = "LEWATI • STREAM SIBUK";
       setTimeout(() => { if (currentIndex === idx) playNext(); }, 900);
     }
 
     function togglePlay() { if (activeEngine === "native") bgAudio.paused ? bgAudio.play() : bgAudio.pause(); else if (activeEngine === "yt" && ytReady && ytPlayer) isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo(); }
-    function playNext() { if (queue.length) playAtIndex((currentIndex + 1) % queue.length); }
+    function playNext() {
+      if (!queue.length) return;
+      if (repeatMode === 2 && currentIndex >= 0) { playAtIndex(currentIndex); return; }
+      if (isShuffle && queue.length > 1) {
+        let nextIdx = Math.floor(Math.random() * queue.length);
+        if (nextIdx === currentIndex) nextIdx = (currentIndex + 1) % queue.length;
+        playAtIndex(nextIdx);
+      } else {
+        playAtIndex((currentIndex + 1) % queue.length);
+      }
+    }
     function playPrev() { if (queue.length) playAtIndex((currentIndex - 1 + queue.length) % queue.length); }
     function updatePlayIcons() { const ic = isPlaying ? ICON_PAUSE : ICON_PLAY; document.getElementById("miniPlayBtn").innerHTML = ic; document.getElementById("fpPlayBtn").innerHTML = ic; }
     function openSearch() { document.getElementById("brandLogo").style.display = "none"; document.getElementById("topActions").style.display = "none"; document.getElementById("searchWrap").classList.add("active"); document.getElementById("searchInput").focus(); switchTab("search"); }
@@ -553,8 +608,20 @@
       const d = document.getElementById("fpDrawer"), title = document.getElementById("drawerTitle"), body = document.getElementById("drawerBody");
       d.style.display = "flex";
       if (type === "queue") {
-        title.textContent = "UP NEXT (ANTREAN)";
-        body.innerHTML = queue.map((t, i) => `<div class="song-row" onclick="playAtIndex(${i});closeDrawer();" style="margin-bottom:6px;"><img src="${escHtml(t.cover)}" /><div class="song-meta"><div class="song-title ${i===currentIndex?'playing-text':''}">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div></div>`).join("");
+        title.textContent = "BERIKUTNYA (ANTREAN)";
+        body.innerHTML = queue.map((t, i) => `<div class="song-row" onclick="playAtIndex(${i});closeDrawer();" style="margin-bottom:6px;"><img src="${escHtml(t.cover)}" /><div class="song-meta"><div class="song-title ${i===currentIndex?'playing-text':''}">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`).join("");
+      } else if (type === "related") {
+        title.textContent = "LAGU TERKAIT";
+        if (currentIndex < 0) return;
+        const cur = queue[currentIndex];
+        body.textContent = "Mencari lagu terkait...";
+        try {
+          const rel = await fetchCatalog(`${cur.artist} mix`, 15);
+          body.innerHTML = rel.map((t, i) => {
+            const u = registerTrack(t);
+            return `<div class="song-row" onclick="selectTrackById('${u}');closeDrawer();" style="margin-bottom:6px;"><span class="track-num">${i+1}</span><img src="${escHtml(t.cover)}" /><div class="song-meta"><div class="song-title">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`;
+          }).join("");
+        } catch { body.textContent = "Gagal memuat lagu terkait."; }
       } else {
         title.textContent = "LIRIK LAGU"; if (currentIndex < 0) return; const t = queue[currentIndex]; body.textContent = "Mencari lirik...";
         try { const data = await (await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(t.artist)}&track_name=${encodeURIComponent(t.title)}`)).json(); body.textContent = data.plainLyrics || "Lirik tidak tersedia."; } catch { body.textContent = "Lirik tidak ditemukan."; }
