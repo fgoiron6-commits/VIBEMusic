@@ -85,6 +85,13 @@
     .fp-drawer-body { flex:1; overflow-y:auto; margin-top:12px; white-space:pre-line; line-height:1.75; color:#e5e5ea; font-size:0.95rem; }
     .loader { text-align:center; color:var(--muted); padding:40px 16px; font-size:0.9rem; }
     #ytHiddenWrap { position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none; bottom:0; left:0; }
+
+    .sec-row-head { display:flex; justify-content:space-between; align-items:center; padding:0 16px 12px; }
+    .play-all-btn { background:none; border:1px solid var(--border); color:#fff; padding:5px 12px; border-radius:99px; font-size:0.75rem; font-weight:600; cursor:pointer; }
+    .shortcut-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:0 16px; }
+    .shortcut-card { position:relative; aspect-ratio:1/1; border-radius:8px; overflow:hidden; background:var(--elev); cursor:pointer; }
+    .shortcut-card img { width:100%; height:100%; object-fit:cover; display:block; }
+    .shortcut-label { position:absolute; inset:auto 0 0 0; padding:18px 8px 7px; background:linear-gradient(transparent,rgba(0,0,0,0.85)); font-size:0.76rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   </style>
 </head>
 <body>
@@ -106,12 +113,12 @@
   </div>
 
   <div class="chips" id="moodChips">
-    <div class="chip active" onclick="filterMood(this, '')">Untukmu</div>
-    <div class="chip" onclick="filterMood(this, 'Tulus Nadin Amizah Hindia')">Indo Indie</div>
-    <div class="chip" onclick="filterMood(this, 'Daniel Caesar Frank Ocean Rex Orange County')">Chill R&B</div>
-    <div class="chip" onclick="filterMood(this, 'Olivia Rodrigo LANY Justin Bieber')">Global Pop</div>
-    <div class="chip" onclick="filterMood(this, 'lagu galau indonesia viral')">Galau Viral</div>
-    <div class="chip" onclick="filterMood(this, 'Pamungkas Feby Putri Sal Priadi')">Akustik</div>
+    <div class="chip active" onclick="filterMood(this, '')">Senang</div>
+    <div class="chip" onclick="filterMood(this, 'Arctic Monkeys Dua Lipa Coldplay Billie Eilish')">Mix Eropa</div>
+    <div class="chip" onclick="filterMood(this, 'Daniel Caesar Frank Ocean Rex Orange County')">Bersantai</div>
+    <div class="chip" onclick="filterMood(this, 'Tame Impala Glass Animals Stromae')">Perjalanan</div>
+    <div class="chip" onclick="filterMood(this, 'Dua Lipa Calvin Harris David Guetta')">Mengisi energi</div>
+    <div class="chip" onclick="filterMood(this, 'Billie Eilish Lorde Tulus Nadin Amizah')">Sedih</div>
   </div>
 
   <div id="viewHome"><div id="homeContent"><div class="loader">Menyiapkan deretan lagu pilihanmu...</div></div></div>
@@ -387,28 +394,79 @@
       }
     });
 
+    function shuffleArr(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function playMixAll(startIdx = 0) {
+      if (!queue.length) return;
+      playAtIndex(startIdx);
+    }
+
     window.addEventListener("DOMContentLoaded", async () => {
       const container = document.getElementById("homeContent");
       try {
-        const [qp, tr, ch, extra] = await Promise.all([
-          fetchCatalog("Tulus Nadin Amizah Hindia", 12),
-          fetchCatalog("Top Hits Indonesia 2026", 12),
-          fetchCatalog("Daniel Caesar Frank Ocean LANY", 12),
-          fetchCatalog("Pamungkas Sal Priadi Olivia Rodrigo", 25)
+        const [euroMix, randMix, shortcuts, moreTracks] = await Promise.all([
+          fetchCatalog("Arctic Monkeys Dua Lipa Coldplay Billie Eilish", 12),
+          fetchCatalog("Daniel Caesar NIKI Bleachers Tulus", 12),
+          fetchCatalog("Lorde Glass Animals Tame Impala Olivia Rodrigo", 12),
+          fetchCatalog("European Indie Pop Hits Stromae Disclosure", 25)
         ]);
-        queue = [...qp, ...tr, ...ch, ...extra];
-        const hero = qp[0] || tr[0], heroUid = registerTrack(hero);
-        const topSix = [...tr.slice(0, 3), ...ch.slice(0, 3)];
+
+        const mixList = shuffleArr([...euroMix.slice(0, 6), ...randMix.slice(0, 6)]);
+        const shortcutList = shuffleArr(shortcuts).slice(0, 9);
+        const scrollList = shuffleArr([...euroMix.slice(4), ...randMix.slice(4), ...moreTracks]);
+
+        queue = [...mixList, ...scrollList, ...shortcutList];
+        const firstMixIdx = 0;
+
         container.innerHTML = `
-          ${hero ? `<div class="hero-banner" onclick="selectTrackById('${heroUid}')"><img src="${escHtml(hero.cover)}" /><div class="hero-info"><div class="hero-tag">PILIHAN UTAMA HARI INI</div><div class="hero-title">${escHtml(hero.title)}</div><div class="hero-sub">${escHtml(hero.artist)} • Background Audio</div></div><div class="hero-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>` : ""}
-          <div class="compact-grid">${topSix.map(t => { const u = registerTrack(t); return `<div class="compact-card" onclick="selectTrackById('${u}')"><img src="${escHtml(t.cover)}" /><div class="compact-title">${escHtml(t.title)}</div></div>`; }).join("")}</div>
-          <div class="section"><div class="section-header"><span class="section-sub">PILIHAN CEPAT</span><span class="section-title">Quick picks</span></div><div class="quick-grid">${qp.map(t => renderSongRow(t)).join("")}</div></div>
-          <div class="section"><div class="section-header"><span class="section-sub">LAGI POPULER</span><span class="section-title">Trending Indonesia</span></div><div class="cards-row">${tr.map(t => renderVCard(t)).join("")}</div></div>
-          <div class="section"><div class="section-header"><span class="section-sub">SANTAI & VIBE</span><span class="section-title">Chill & R&B Mix</span></div><div class="cards-row">${ch.map(t => renderVCard(t)).join("")}</div></div>
-          <div class="section"><div class="section-header"><span class="section-sub">DERETAN LAGU LENGKAP</span><span class="section-title">Rekomendasi Untukmu</span></div><div class="v-list">${extra.map((t, i) => renderNumberedRow(t, i + 1)).join("")}</div></div>
+          <div class="section">
+            <div class="sec-row-head">
+              <span class="section-title">Mix lagu</span>
+              <button class="play-all-btn" onclick="playMixAll(${firstMixIdx})">Putar semua</button>
+            </div>
+            <div class="quick-grid">${mixList.map(t => renderMixRow(t)).join("")}</div>
+          </div>
+
+          <div class="section">
+            <div class="sec-row-head">
+              <span class="section-title">Pintasan cepat</span>
+            </div>
+            <div class="shortcut-grid">
+              ${shortcutList.map(t => {
+                const u = registerTrack(t);
+                return `<div class="shortcut-card" onclick="selectTrackById('${u}')"><img src="${escHtml(t.cover)}" loading="lazy" /><div class="shortcut-label">${escHtml(t.title)}</div></div>`;
+              }).join("")}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="sec-row-head">
+              <span class="section-title">Mix Eropa &amp; Pilihan Acak</span>
+            </div>
+            <div class="cards-row">${euroMix.map(t => renderVCard(t)).join("")}</div>
+          </div>
+
+          <div class="section">
+            <div class="sec-row-head">
+              <span class="section-title">Jelajahi Lebih Banyak</span>
+            </div>
+            <div class="v-list">${scrollList.map((t, i) => renderNumberedRow(t, i + 1)).join("")}</div>
+          </div>
         `;
       } catch { container.innerHTML = '<div class="loader">Gagal memuat katalog. Periksa koneksi internetmu.</div>'; }
     });
+
+    function renderMixRow(t) {
+      const u = registerTrack(t);
+      return `<div class="song-row" onclick="selectTrackById('${u}')"><img src="${escHtml(t.cover)}" loading="lazy" /><div class="song-meta"><div class="song-title">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div></div>`;
+    }
 
     function renderSongRow(t) { const u = registerTrack(t); return `<div class="song-row" onclick="selectTrackById('${u}')"><img src="${escHtml(t.cover)}" loading="lazy" /><div class="song-meta"><div class="song-title">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`; }
     function renderNumberedRow(t, n) { const u = registerTrack(t); return `<div class="song-row" onclick="selectTrackById('${u}')"><span class="track-num">${n}</span><img src="${escHtml(t.cover)}" loading="lazy" /><div class="song-meta"><div class="song-title">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`; }
