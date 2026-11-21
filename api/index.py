@@ -1,22 +1,23 @@
+import os
+import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from ytmusicapi import YTMusic
-import requests
-import os
-SOUNDSTAT_KEY = os.environ.get("SOUNDSTAT_API_KEY", "")
-RELATED_CACHE = {}
 
 app = Flask(__name__)
 CORS(app)
+
+SOUNDSTAT_KEY = os.environ.get("SOUNDSTAT_API_KEY", "")
+RELATED_CACHE = {}
 
 try:
     yt = YTMusic()
 except Exception:
     yt = None
 
-def fallback_catalog(query, limit=15):
+def fallback_catalog(query, limit=18):
     results = []
-    # 1. Cadangan Audius (Full Track langsung)
+    # 1. Audius (Full Track langsung)
     try:
         r = requests.get(
             "https://discoveryprovider.audius.co/v1/tracks/search",
@@ -42,7 +43,7 @@ def fallback_catalog(query, limit=15):
     except Exception:
         pass
 
-    # 2. Cadangan iTunes (Metadata & Sampul HD)
+    # 2. iTunes (Metadata & Sampul HD)
     if len(results) < limit:
         try:
             r = requests.get(
@@ -73,7 +74,6 @@ def search():
     if not q:
         return jsonify({"results": []})
 
-    # Jalur Utama: ytmusicapi
     if yt:
         try:
             raw = yt.search(q, filter="songs", limit=limit)
@@ -98,7 +98,6 @@ def search():
         except Exception:
             pass
 
-    # Jalur Cadangan otomatis jika IP cloud dibatasi YouTube
     return jsonify({"source": "fallback", "results": fallback_catalog(q, limit)})
 
 @app.route("/api/related")
@@ -109,7 +108,7 @@ def related():
     if cache_key in RELATED_CACHE:
         return jsonify({"source": "cache", "results": RELATED_CACHE[cache_key]})
 
-    # 1. Coba rekomendasi SoundStat jika API Key terpasang & ada query/track
+    # 1. SoundStat API (jika SOUNDSTAT_API_KEY aktif di Vercel)
     if SOUNDSTAT_KEY and q:
         try:
             sr = requests.get(
@@ -124,7 +123,7 @@ def related():
                     tid = items[0]["id"]
                     rr = requests.get(
                         f"https://soundstat.info/api/v1/tracks/{tid}/recommendations",
-                        params={"limit": 12},
+                        params={"limit": 14},
                         headers={"X-API-Key": SOUNDSTAT_KEY},
                         timeout=3.5
                     )
@@ -149,8 +148,7 @@ def related():
         except Exception:
             pass
 
-    vid = (request.args.get("videoId") or "").strip()
-    q = (request.args.get("q") or "").strip()
+    # 2. ytmusicapi Watch Playlist
     if yt and vid and len(vid) == 11:
         try:
             watch = yt.get_watch_playlist(videoId=vid, limit=15)
@@ -172,9 +170,11 @@ def related():
                     "cover": cover
                 })
             if parsed:
+                RELATED_CACHE[cache_key] = parsed
                 return jsonify({"source": "ytmusicapi", "results": parsed})
         except Exception:
             pass
+
     return jsonify({"source": "fallback", "results": fallback_catalog(q or "indie pop mix", 15)})
 
 if __name__ == "__main__":
