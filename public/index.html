@@ -124,6 +124,16 @@
     .q-chips::-webkit-scrollbar { display:none; }
     .q-chip { background:rgba(255,255,255,0.1); border:none; color:#fff; padding:6px 13px; border-radius:8px; font-size:0.78rem; font-weight:600; white-space:nowrap; cursor:pointer; }
     .q-chip.active { background:#ffffff; color:#0b0f19; }
+  
+    .chip { cursor: pointer; transition: all 0.2s ease; user-select: none; }
+    .chip.active { background: #FF0055 !important; color: #fff !important; border-color: #FF0055 !important; font-weight: 700; }
+    .tool-pills-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0 6px; }
+    .tool-pill { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #ddd; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .tool-pill.active { background: rgba(255,0,85,0.22); border-color: #FF0055; color: #ff6b9d; }
+    .lib-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .lib-tab { flex: 1; padding: 9px; border-radius: 10px; background: rgba(255,255,255,0.06); color: #aaa; text-align: center; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .lib-tab.active { background: #FF0055; color: #fff; }
+
   </style>
 </head>
 <body>
@@ -185,7 +195,14 @@
       <button class="icon-btn" id="likeBtn" onclick="toggleLike()"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/></svg></button>
     </div>
     <div class="seek-wrap"><input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" oninput="seekTo(this.value)" /><div class="time-row"><span id="curTime">0:00</span><span id="durTime">0:00</span></div></div>
-    <div class="fp-controls">
+    
+        <div class="tool-pills-row">
+          <button class="tool-pill" id="sleepTimerBtn" onclick="cycleSleepTimer()">⏱ Sleep: Off</button>
+          <button class="tool-pill" id="eqPresetBtn" onclick="cycleEqPreset()">🎛 EQ: Normal</button>
+          <button class="tool-pill" onclick="openDrawer('lyrics')">🎤 Lirik</button>
+        </div>
+
+        <div class="fp-controls">
       <button class="icon-btn" id="shuffleBtn" onclick="toggleShuffle()" title="Acak"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
       <button class="icon-btn" onclick="playPrev()"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
       <button class="play-circle" onclick="togglePlay()" id="fpPlayBtn"></button>
@@ -976,6 +993,186 @@
       }
     }
     function closeDrawer() { document.getElementById("fpDrawer").style.display = "none"; }
+
+    // === UPGRADE v2.0: MOOD CHIPS, SLEEP TIMER, EQUALIZER, ANTI-STUCK & PERSISTENT LIBRARY ===
+    const MOOD_QUERIES = {
+      random: ["Sabrina Carpenter Chappell Roan Billie Eilish 2026", "Bruno Mars Lady Gaga ROSÉ APT viral", "Tulus Bernadya Mahalini Juicy Luicy", "Daniel Caesar Frank Ocean SZA NIKI"],
+      senang: ["Sabrina Carpenter Espresso Dua Lipa Levitating Happy Pop", "Bruno Mars Uptown Funk Pharrell Williams", "Tulus Hati-Hati di Jalan RAN Pandangan Pertama"],
+      eropa: ["Stromae Central Cee Raye Dua Lipa Fred again", "Arctic Monkeys Coldplay Glass Animals Calvin Harris", "Euro Top Hits 2026 Viral Dance Pop"],
+      santai: ["Daniel Caesar Best Part Rex Orange County", "Wave to Earth d4vd Keshi LANY chill", "Nadin Amizah Feby Putri Hindia akustik santai"],
+      indo: ["Bernadya Satu Bulan Mahalini Sial", "Juicy Luicy Lantas Sal Priadi Gala Bunga Matahari", "Lyodra Tiara Andini Rizky Febian hits"],
+      energi: ["Kendrick Lamar Travis Scott The Weeknd workout", "Imagine Dragons Linkin Park OneRepublic", "Jennie Lisa aespa NewJeans upbeat hits"],
+      rnb: ["Frank Ocean SZA Brent Faiyaz Summer Walker", "Bryson Tiller Partynextdoor Kehlani", "Giveon PinkPantheress Ravyn Lenae late night"]
+    };
+
+    async function selectMoodChip(el, moodKey) {
+      document.querySelectorAll("#moodChipsRow .chip").forEach(c => c.classList.remove("active"));
+      el.classList.add("active");
+      const container = document.getElementById("homeContent");
+      container.innerHTML = '<div class="loader">Memuat mix ' + escHtml(el.textContent) + '...</div>';
+      const qs = MOOD_QUERIES[moodKey] || MOOD_QUERIES.random;
+      const picked = shuffleArr(qs).slice(0, 3);
+      try {
+        const batches = await Promise.all(picked.map(q => fetchCatalog(q, 18)));
+        const items = shuffleArr(batches.flat());
+        const uniq = [];
+        const seen = new Set();
+        for (const t of items) {
+          const k = `${(t.title||"").toLowerCase()}-${(t.artist||"").toLowerCase()}`;
+          if (!seen.has(k)) { seen.add(k); uniq.push(t); }
+        }
+        queue = uniq;
+        container.innerHTML = `
+          <div class="section">
+            <div class="sec-row-head">
+              <span class="section-title">Mix ${escHtml(el.textContent)}</span>
+              <button class="play-all-btn" onclick="playMixAll(0)">Putar semua</button>
+            </div>
+            <div class="quick-grid">${uniq.slice(0, 8).map(t => renderMixRow(t)).join("")}</div>
+          </div>
+          <div class="section">
+            <div class="sec-row-head">
+              <span class="section-title">Pilihan Lagu ${escHtml(el.textContent)}</span>
+            </div>
+            <div class="v-list">${uniq.slice(8, 35).map((t, i) => renderNumberedRow(t, i + 1)).join("")}</div>
+          </div>
+        `;
+      } catch {
+        container.innerHTML = '<div class="loader">Gagal memuat kategori. Coba lagi.</div>';
+      }
+    }
+
+    // Sleep Timer
+    const SLEEP_OPTIONS = [0, 15, 30, 45, 60];
+    let sleepIdx = 0;
+    let sleepEndTime = 0;
+    let sleepInterval = null;
+
+    function cycleSleepTimer() {
+      sleepIdx = (sleepIdx + 1) % SLEEP_OPTIONS.length;
+      const mins = SLEEP_OPTIONS[sleepIdx];
+      clearInterval(sleepInterval);
+      const btn = document.getElementById("sleepTimerBtn");
+      if (mins === 0) {
+        sleepEndTime = 0;
+        if (btn) { btn.textContent = "⏱ Sleep: Off"; btn.classList.remove("active"); }
+        return;
+      }
+      sleepEndTime = Date.now() + mins * 60 * 1000;
+      if (btn) btn.classList.add("active");
+      sleepInterval = setInterval(() => {
+        const rem = sleepEndTime - Date.now();
+        if (rem <= 0) {
+          clearInterval(sleepInterval);
+          sleepIdx = 0;
+          userPaused = true;
+          bgAudio.pause();
+          isPlaying = false;
+          updatePlayIcons();
+          if (btn) { btn.textContent = "⏱ Sleep: Selesai"; btn.classList.remove("active"); }
+        } else {
+          const m = Math.floor(rem / 60000);
+          const s = Math.floor((rem % 60000) / 1000);
+          if (btn) btn.textContent = `⏱ ${m}:${String(s).padStart(2, "0")}`;
+        }
+      }, 1000);
+    }
+
+    // Equalizer & Bass Boost via Web Audio API
+    const EQ_PRESETS = [
+      { name: "Normal", bass: 0, mid: 0, treble: 0 },
+      { name: "Bass Boost", bass: 7, mid: -1, treble: 2 },
+      { name: "Vocal Clear", bass: -2, mid: 5, treble: 4 },
+      { name: "Pop Bright", bass: 3, mid: 1, treble: 6 }
+    ];
+    let eqIdx = 0;
+    let audioCtx = null, bassFilter = null, midFilter = null, trebleFilter = null;
+
+    function initEqualizer() {
+      if (audioCtx) return;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AC();
+        const src = audioCtx.createMediaElementSource(bgAudio);
+        bassFilter = audioCtx.createBiquadFilter();
+        bassFilter.type = "lowshelf";
+        bassFilter.frequency.value = 150;
+
+        midFilter = audioCtx.createBiquadFilter();
+        midFilter.type = "peaking";
+        midFilter.frequency.value = 1200;
+
+        trebleFilter = audioCtx.createBiquadFilter();
+        trebleFilter.type = "highshelf";
+        trebleFilter.frequency.value = 4000;
+
+        src.connect(bassFilter);
+        bassFilter.connect(midFilter);
+        midFilter.connect(trebleFilter);
+        trebleFilter.connect(audioCtx.destination);
+      } catch {}
+    }
+
+    function cycleEqPreset() {
+      initEqualizer();
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      eqIdx = (eqIdx + 1) % EQ_PRESETS.length;
+      const p = EQ_PRESETS[eqIdx];
+      if (bassFilter) bassFilter.gain.value = p.bass;
+      if (midFilter) midFilter.gain.value = p.mid;
+      if (trebleFilter) trebleFilter.gain.value = p.treble;
+      const btn = document.getElementById("eqPresetBtn");
+      if (btn) {
+        btn.textContent = `🎛 EQ: ${p.name}`;
+        btn.classList.toggle("active", eqIdx !== 0);
+      }
+    }
+
+    // Simpan Riwayat Putar ke localStorage
+    function saveRecentTrack(track) {
+      if (!track || !track.title) return;
+      try {
+        let rec = JSON.parse(localStorage.getItem("vibe_recent_tracks") || "[]");
+        rec = rec.filter(x => !(x.title === track.title && x.artist === track.artist));
+        rec.unshift({
+          videoId: track.videoId || "",
+          trackId: track.trackId || "",
+          title: track.title,
+          artist: track.artist,
+          duration: track.duration || "3:30",
+          cover: track.cover || "",
+          directAudio: track.directAudio || "",
+          previewUrl: track.previewUrl || ""
+        });
+        localStorage.setItem("vibe_recent_tracks", JSON.stringify(rec.slice(0, 30)));
+      } catch {}
+    }
+
+    bgAudio.addEventListener("playing", () => {
+      if (queue[currentIndex]) saveRecentTrack(queue[currentIndex]);
+    });
+
+    // Watchdog Anti-Stuck: deteksi jika lagu macet/buffering > 7 detik
+    let lastCheckedTime = -1;
+    let stuckCounter = 0;
+    setInterval(() => {
+      if (isPlaying && !userPaused && activeEngine === "native" && !bgAudio.paused) {
+        if (Math.abs(bgAudio.currentTime - lastCheckedTime) < 0.15) {
+          stuckCounter++;
+          if (stuckCounter >= 7) {
+            stuckCounter = 0;
+            document.getElementById("streamSourceBadge").textContent = "AUTO-RECOVER • BERIKUTNYA";
+            playNext();
+          }
+        } else {
+          stuckCounter = 0;
+          lastCheckedTime = bgAudio.currentTime;
+        }
+      } else {
+        stuckCounter = 0;
+      }
+    }, 1000);
+
   </script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
 </body>
