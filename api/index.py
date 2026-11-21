@@ -109,7 +109,6 @@ def search():
     results = []
     seen = set()
 
-    # 1. Utamakan ytmusicapi TANPA diacak agar hasil teratas paling akurat
     if yt:
         try:
             raw = yt.search(q, filter="songs", limit=limit)
@@ -136,7 +135,6 @@ def search():
         except Exception:
             pass
 
-    # 2. Lengkapi dengan iTunes Metadata (untuk artis major seperti Daniel Caesar, dll) - TANPA previewUrl
     if len(results) < limit:
         try:
             ir = requests.get(
@@ -166,7 +164,6 @@ def search():
         except Exception:
             pass
 
-    # 3. Tambah Audius jika masih kurang
     if len(results) < limit:
         for a in search_audius_tracks(q, limit - len(results)):
             key = f"{a['title'].lower()}::{a['artist'].lower()}"

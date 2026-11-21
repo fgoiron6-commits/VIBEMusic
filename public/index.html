@@ -472,6 +472,24 @@
         if (itList.length) return itList;
       } catch {}
 
+      // Fallback metadata lengkap dari iTunes (artis major label lengkap, diputar full via resolver)
+      try {
+        const it = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
+        const iJson = await it.json();
+        const itList = (iJson.results || []).map(item => {
+          const sec = Math.floor((item.trackTimeMillis || 210000) / 1000);
+          return {
+            videoId: "",
+            trackId: `it_${item.trackId || Math.random()}`,
+            title: item.trackName || "Unknown",
+            artist: item.artistName || "Unknown Artist",
+            duration: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`,
+            cover: (item.artworkUrl100 || "").replace("100x100bb", "500x500bb")
+          };
+        });
+        if (itList.length) return itList;
+      } catch {}
+
       // Fallback langsung dari browser ke Audius (100% Full Track)
       try {
         const aud = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(query)}&limit=${limit}`);
