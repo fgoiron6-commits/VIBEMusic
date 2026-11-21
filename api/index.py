@@ -274,5 +274,97 @@ def add_no_cache_headers(response):
     response.headers["Pragma"] = "no-cache"
     return response
 
+
+PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.adminforge.de",
+    "https://pipedapi.leptons.xyz",
+    "https://api.piped.private.coffee"
+]
+INV_INSTANCES = [
+    "https://inv.nadeko.net",
+    "https://yt.artemislena.eu",
+    "https://invidious.nerdvpn.de",
+    "https://invidious.jing.rocks"
+]
+
+@app.route("/api/audio")
+def get_audio_url():
+    vid = (request.args.get("videoId") or "").strip()
+    title = (request.args.get("title") or "").strip()
+    artist = (request.args.get("artist") or "").strip()
+    q = f"{title} {artist}".strip()
+
+    # 1. Coba Audius dengan pencocokan fleksibel
+    if q:
+        try:
+            ar = requests.get(
+                "https://discoveryprovider.audius.co/v1/tracks/search",
+                params={"query": q, "limit": 5},
+                timeout=3.0
+            )
+            if ar.ok:
+                data = ar.json().get("data") or []
+                t_low = title.lower()
+                for item in data:
+                    tid = item.get("id")
+                    name = (item.get("title") or "").lower()
+                    if tid and (not t_low or t_low[:4] in name or name[:4] in t_low):
+                        return jsonify({
+                            "url": f"https://discoveryprovider.audius.co/v1/tracks/{tid}/stream",
+                            "source": "AUDIUS FULL"
+                        })
+        except Exception:
+            pass
+
+    # 2. Cari videoId jika belum ada
+    if (not vid or len(vid) != 11) and yt and q:
+        try:
+            hits = yt.search(q, filter="songs", limit=2)
+            if hits and hits[0].get("videoId"):
+                vid = hits[0]["videoId"]
+        except Exception:
+            pass
+
+    # 3. Ambil stream audio dari daftar instance Piped & Invidious
+    if vid and len(vid) == 11:
+        for base in INV_INSTANCES:
+            try:
+                r = requests.get(f"{base}/api/v1/videos/{vid}", timeout=2.8)
+                if r.ok:
+                    for f in (r.json().get("adaptiveFormats") or []):
+                        mime = f.get("type") or ""
+                        if ("audio/mp4" in mime or "audio/webm" in mime) and f.get("url"):
+                            return jsonify({"url": f["url"], "source": "STREAM FULL", "videoId": vid})
+            except Exception:
+                continue
+
+        for base in PIPED_INSTANCES:
+            try:
+                r = requests.get(f"{base}/streams/{vid}", timeout=2.8)
+                if r.ok:
+                    for f in (r.json().get("audioStreams") or []):
+                        if f.get("url"):
+                            return jsonify({"url": f["url"], "source": "STREAM FULL", "videoId": vid})
+            except Exception:
+                continue
+
+    # 4. Fallback terakhir: iTunes Audio agar tidak pernah gagal bunyi
+    if q:
+        try:
+            ir = requests.get(
+                "https://itunes.apple.com/search",
+                params={"term": q, "media": "music", "entity": "song", "limit": 1, "country": "ID"},
+                timeout=2.5
+            )
+            if ir.ok:
+                res = ir.json().get("results") or []
+                if res and res[0].get("previewUrl"):
+                    return jsonify({"url": res[0]["previewUrl"], "source": "PREVIEW FALLBACK"})
+        except Exception:
+            pass
+
+    return jsonify({"error": "unavailable"}), 404
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

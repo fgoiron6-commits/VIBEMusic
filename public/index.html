@@ -486,38 +486,47 @@
       return null;
     }
 
+    let playToken = 0;
+
     async function resolveNativeAudio(track, vid) {
-      const q = `${track.title} ${track.artist}`;
+      const q = `${track.title || ""} ${track.artist || ""}`.trim();
+
+      // Jalankan pencarian Audius klien & endpoint /api/audio server secara bersamaan (balapan tercepat)
+      const tasks = [
+        (async () => {
+          const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=5`);
+          const json = await res.json();
+          const tLow = (track.title || "").toLowerCase();
+          const hit = (json.data || []).find(t => t.id && (!tLow || t.title.toLowerCase().includes(tLow.slice(0, 4)) || tLow.includes(t.title.toLowerCase().slice(0, 4))));
+          if (hit?.id) return { url: `https://discoveryprovider.audius.co/v1/tracks/${hit.id}/stream`, label: "BACKGROUND FULL • AUDIUS" };
+          throw new Error("no-audius");
+        })(),
+        (async () => {
+          const r = await fetch(`/api/audio?videoId=${encodeURIComponent(vid || "")}&title=${encodeURIComponent(track.title || "")}&artist=${encodeURIComponent(track.artist || "")}`);
+          if (!r.ok) throw new Error("no-server-audio");
+          const d = await r.json();
+          if (d.url && d.source !== "PREVIEW FALLBACK") return { url: d.url, label: `BACKGROUND • ${d.source}` };
+          throw new Error("only-preview");
+        })()
+      ];
+
       try {
-        const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=3`);
-        const json = await res.json();
-        const hit = (json.data || []).find(t => t.id && t.title.toLowerCase().includes(track.title.toLowerCase().slice(0, 6)));
-        if (hit?.id) return { url: `https://discoveryprovider.audius.co/v1/tracks/${hit.id}/stream`, label: "BACKGROUND FULL • AUDIUS" };
+        const fastest = await Promise.any(tasks);
+        if (fastest?.url) return fastest;
       } catch {}
 
-      if (vid) {
-        const streamHosts = [
-          { url: `https://inv.nadeko.net/api/v1/videos/${vid}`, type: "inv" },
-          { url: `https://yt.artemislena.eu/api/v1/videos/${vid}`, type: "inv" },
-          { url: `https://pipedapi.kavin.rocks/streams/${vid}`, type: "piped" },
-          { url: `https://pipedapi.adminforge.de/streams/${vid}`, type: "piped" }
-        ];
-        try {
-          const stream = await Promise.any(streamHosts.map(async (sh) => {
-            const ctrl = new AbortController();
-            const tmr = setTimeout(() => ctrl.abort(), 3200);
-            const r = await fetch(sh.url, { signal: ctrl.signal });
-            clearTimeout(tmr);
-            if (!r.ok) throw new Error("fail");
-            const d = await r.json();
-            const list = sh.type === "inv" ? (d.adaptiveFormats || []) : (d.audioStreams || []);
-            const aud = list.find(f => (f.type || f.mimeType || "").includes("audio/mp4") || (f.type || f.mimeType || "").includes("audio/webm"));
-            if (aud?.url) return { url: aud.url, label: "BACKGROUND FULL • STREAM" };
-            throw new Error("no-audio");
-          }));
-          if (stream) return stream;
-        } catch {}
+      // Jika stream penuh sedang sibuk, pakai previewUrl agar musik tetap berbunyi tanpa error
+      if (track.previewUrl) {
+        return { url: track.previewUrl, label: "AUDIO CADANGAN • PREVIEW" };
       }
+
+      try {
+        const ir = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=1&country=ID`);
+        const ij = await ir.json();
+        const pUrl = ij.results?.[0]?.previewUrl;
+        if (pUrl) return { url: pUrl, label: "AUDIO CADANGAN • PREVIEW" };
+      } catch {}
+
       return null;
     }
 
@@ -677,7 +686,11 @@
 
     async function playAtIndex(idx) {
       if (idx < 0 || idx >= queue.length) return;
-      currentIndex = idx; const track = queue[idx];
+      const myToken = ++playToken;
+      currentIndex = idx;
+      userPaused = false;
+      const track = queue[idx];
+
       document.getElementById("miniPlayer").style.display = "flex";
       document.getElementById("miniCover").src = track.cover;
       document.getElementById("miniTitle").textContent = track.title;
@@ -686,34 +699,52 @@
       document.getElementById("fpTitle").textContent = track.title;
       document.getElementById("fpArtist").textContent = track.artist;
       document.getElementById("streamSourceBadge").textContent = "MENCARI AUDIO...";
-      updateLikeIcon(); syncMediaSession(track);
+      updateLikeIcon();
+      syncMediaSession(track);
+
+      bgAudio.pause();
 
       if (track.directAudio) {
         activeEngine = "native";
-        document.getElementById("streamSourceBadge").textContent = "YTMUSIC • DIRECT AUDIO";
+        document.getElementById("streamSourceBadge").textContent = "BACKGROUND FULL • DIRECT";
         bgAudio.src = track.directAudio;
-        try { await bgAudio.play(); return; } catch {}
+        try {
+          if (myToken !== playToken) return;
+          await bgAudio.play();
+          return;
+        } catch {}
       }
+
       const vid = await resolveFullVideoId(track);
+      if (myToken !== playToken) return;
       if (vid) track.videoId = vid;
-      if (track.directAudio) {
-        activeEngine = "native";
-        document.getElementById("streamSourceBadge").textContent = "SPOTI RESOLVER • FULL AUDIO";
-        bgAudio.src = track.directAudio;
-        try { await bgAudio.play(); return; } catch {}
-      }
 
       const nativeStream = await resolveNativeAudio(track, vid);
+      if (myToken !== playToken) return;
+
       if (nativeStream?.url) {
         activeEngine = "native";
         if (ytReady && ytPlayer?.stopVideo) ytPlayer.stopVideo();
         document.getElementById("streamSourceBadge").textContent = nativeStream.label;
         bgAudio.src = nativeStream.url;
-        try { await bgAudio.play(); return; } catch {}
+        try {
+          await bgAudio.play();
+          return;
+        } catch {
+          // Jika URL stream utama diblokir browser, coba fallback previewUrl sebelum skip
+          if (track.previewUrl && nativeStream.url !== track.previewUrl) {
+            document.getElementById("streamSourceBadge").textContent = "AUDIO CADANGAN • PREVIEW";
+            bgAudio.src = track.previewUrl;
+            try { await bgAudio.play(); return; } catch {}
+          }
+        }
       }
 
-      document.getElementById("streamSourceBadge").textContent = "LEWATI • STREAM SIBUK";
-      setTimeout(() => { if (currentIndex === idx) playNext(); }, 900);
+      if (myToken !== playToken) return;
+      document.getElementById("streamSourceBadge").textContent = "LEWATI • TIDAK TERSEDIA";
+      setTimeout(() => {
+        if (myToken === playToken && currentIndex === idx) playNext();
+      }, 1200);
     }
 
     function togglePlay() {
