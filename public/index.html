@@ -152,6 +152,19 @@
     .d-tab.active { background: #FF0055; color: #fff; }
     .drawer-box { margin-top: 12px; max-height: 240px; overflow-y: auto; }
     .lyrics-text { white-space: pre-line; font-size: 14px; line-height: 1.65; color: #e2e2e2; text-align: center; padding: 10px; }
+  
+    .sync-wrap { display: flex; flex-direction: column; gap: 12px; padding: 18px 8px 48px; }
+    .sync-line {
+      font-size: 16px; font-weight: 700; line-height: 1.45; color: rgba(255,255,255,0.34);
+      text-align: center; cursor: pointer; transition: all 0.28s ease; padding: 4px 10px; border-radius: 10px;
+    }
+    .sync-line.active {
+      color: #ffffff; font-size: 19px; font-weight: 800;
+      text-shadow: 0 0 18px rgba(255, 0, 85, 0.55);
+      transform: scale(1.03);
+    }
+    .sync-line.past { color: rgba(255,255,255,0.52); }
+
   </style>
 </head>
 <body>
@@ -747,16 +760,7 @@
       } else {
         const cur = queue[currentIndex];
         if (!cur) return;
-        box.innerHTML = '<div class="loader">Mencari lirik...</div>';
-        try {
-          const lr = await fetchWithTimeout(`https://lrclib.net/api/get?track_name=${encodeURIComponent(cur.title)}&artist_name=${encodeURIComponent(cur.artist)}`, 3500);
-          if (lr.ok) {
-            const ld = await lr.json();
-            box.innerHTML = `<div class="lyrics-text">${esc(ld.plainLyrics || "Lirik tidak tersedia untuk lagu ini.")}</div>`;
-            return;
-          }
-        } catch {}
-        box.innerHTML = '<div class="lyrics-text">Lirik belum tersedia.</div>';
+        await loadAndRenderSyncedLyrics(cur, box);
       }
     }
 
@@ -912,6 +916,130 @@
       document.getElementById("shufBtn").style.color = "#FF0055";
       loadMood(document.querySelector("#moodChips .chip.active"), "random");
     });
+
+    // === SYNCED LYRICS ENGINE (LRC REAL-TIME + TAP TO SEEK) ===
+    let parsedLyrics = [];
+    let currentLyricTrackKey = "";
+    let activeLyricIndex = -1;
+
+    function parseLrcText(lrcStr) {
+      if (!lrcStr) return [];
+      const lines = lrcStr.split(/\r?\n/);
+      const out = [];
+      const timeRegex = /\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g;
+      for (const line of lines) {
+        let match;
+        const times = [];
+        while ((match = timeRegex.exec(line)) !== null) {
+          const min = parseInt(match[1], 10);
+          const sec = parseInt(match[2], 10);
+          const msRaw = match[3] || "0";
+          const ms = parseInt(msRaw.padEnd(3, "0"), 10) / 1000;
+          times.push(min * 60 + sec + ms);
+        }
+        const text = line.replace(timeRegex, "").trim();
+        if (times.length && text) {
+          for (const t of times) out.push({ time: t, text });
+        }
+      }
+      return out.sort((a, b) => a.time - b.time);
+    }
+
+    function jumpToLyricTime(sec) {
+      if (activeEngine === "yt" && ytReady && ytPlayer?.seekTo) {
+        ytPlayer.seekTo(sec, true);
+      } else {
+        bgAudio.currentTime = sec;
+      }
+      updateSyncedLyricHighlight(sec, true);
+    }
+
+    async function loadAndRenderSyncedLyrics(track, box) {
+      const key = `${track.title}::${track.artist}`;
+      if (currentLyricTrackKey !== key) {
+        parsedLyrics = [];
+        activeLyricIndex = -1;
+        currentLyricTrackKey = key;
+        box.innerHTML = '<div class="loader">Menyelaraskan lirik...</div>';
+
+        let record = null;
+        try {
+          const r1 = await fetchWithTimeout(`https://lrclib.net/api/get?track_name=${encodeURIComponent(track.title)}&artist_name=${encodeURIComponent(track.artist)}`, 3600);
+          if (r1.ok) record = await r1.json();
+        } catch {}
+
+        if (!record || (!record.syncedLyrics && !record.plainLyrics)) {
+          try {
+            const q = `${track.title} ${track.artist.split(",")[0]}`.trim();
+            const r2 = await fetchWithTimeout(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`, 3600);
+            if (r2.ok) {
+              const arr = await r2.json();
+              if (Array.isArray(arr) && arr.length) {
+                record = arr.find(x => x.syncedLyrics) || arr[0];
+              }
+            }
+          } catch {}
+        }
+
+        if (currentLyricTrackKey !== key) return;
+
+        if (record?.syncedLyrics) {
+          parsedLyrics = parseLrcText(record.syncedLyrics);
+        } else if (record?.plainLyrics) {
+          box.innerHTML = `<div class="lyrics-text">${esc(record.plainLyrics)}</div>`;
+          return;
+        } else {
+          box.innerHTML = '<div class="lyrics-text">Lirik belum tersedia untuk lagu ini.</div>';
+          return;
+        }
+      }
+
+      if (!parsedLyrics.length) {
+        box.innerHTML = '<div class="lyrics-text">Lirik belum tersedia untuk lagu ini.</div>';
+        return;
+      }
+
+      box.innerHTML = `<div class="sync-wrap" id="syncLyricsWrap">${parsedLyrics.map((item, idx) => `
+        <div class="sync-line" id="sline_${idx}" onclick="jumpToLyricTime(${item.time})">${esc(item.text)}</div>
+      `).join("")}</div>`;
+
+      const now = activeEngine === "yt" && ytReady && ytPlayer?.getCurrentTime ? (ytPlayer.getCurrentTime() || 0) : (bgAudio.currentTime || 0);
+      updateSyncedLyricHighlight(now, true);
+    }
+
+    function updateSyncedLyricHighlight(curSec, forceScroll = false) {
+      if (activeDrawer !== "lyrics" || !parsedLyrics.length) return;
+      let idx = -1;
+      for (let i = 0; i < parsedLyrics.length; i++) {
+        if (curSec + 0.25 >= parsedLyrics[i].time) idx = i;
+        else break;
+      }
+      if (idx === activeLyricIndex && !forceScroll) return;
+      activeLyricIndex = idx;
+
+      parsedLyrics.forEach((_, i) => {
+        const el = document.getElementById(`sline_${i}`);
+        if (!el) return;
+        el.classList.toggle("active", i === idx);
+        el.classList.toggle("past", i < idx);
+      });
+
+      if (idx >= 0) {
+        const activeEl = document.getElementById(`sline_${idx}`);
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }
+
+    setInterval(() => {
+      if (activeDrawer !== "lyrics" || !parsedLyrics.length) return;
+      const cur = activeEngine === "yt" && ytReady && ytPlayer?.getCurrentTime
+        ? (ytPlayer.getCurrentTime() || 0)
+        : (bgAudio.currentTime || 0);
+      updateSyncedLyricHighlight(cur, false);
+    }, 220);
+
   </script>
 </body>
 </html>
