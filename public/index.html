@@ -307,10 +307,13 @@
       else if (activeEngine === "yt" && ytReady && ytPlayer?.getDuration) ytPlayer.seekTo((pct / 100) * ytPlayer.getDuration(), true);
     }
 
-    async function fetchCatalog(query, limit = 15) {
+    async function fetchCatalog(query, limit = 18) {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) { const d = await res.json(); if (d.results?.length && !d.results[0].audioUrl) return d.results; }
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+        if (res.ok) {
+          const d = await res.json();
+          if (d.results && d.results.length > 0) return d.results;
+        }
       } catch {}
       const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
       const json = await itunes.json();
@@ -540,6 +543,12 @@
       document.getElementById("streamSourceBadge").textContent = "MENCARI AUDIO...";
       updateLikeIcon(); syncMediaSession(track);
 
+      if (track.directAudio) {
+        activeEngine = "native";
+        document.getElementById("streamSourceBadge").textContent = "YTMUSIC • DIRECT AUDIO";
+        bgAudio.src = track.directAudio;
+        try { await bgAudio.play(); return; } catch {}
+      }
       const vid = await resolveFullVideoId(track);
       if (vid) track.videoId = vid;
 
@@ -616,7 +625,7 @@
         const cur = queue[currentIndex];
         body.textContent = "Mencari lagu terkait...";
         try {
-          const rel = await fetchCatalog(`${cur.artist} mix`, 15);
+          const relRes = await fetch(`/api/related?videoId=${encodeURIComponent(cur.videoId || "")}&q=${encodeURIComponent(cur.artist + " mix")}`); const rel = (await relRes.json()).results || [];
           body.innerHTML = rel.map((t, i) => {
             const u = registerTrack(t);
             return `<div class="song-row" onclick="selectTrackById('${u}');closeDrawer();" style="margin-bottom:6px;"><span class="track-num">${i+1}</span><img src="${escHtml(t.cover)}" /><div class="song-meta"><div class="song-title">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`;
