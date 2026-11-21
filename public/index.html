@@ -217,6 +217,7 @@
     <div class="fp-drawer-body" id="drawerBody"></div>
   </div>
   <script src="https://www.youtube.com/iframe_api"></script>
+  <audio id="bgAudio" playsinline preload="auto" style="position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;"></audio>
   <script>
     let ytPlayer = null, ytReady = false, activeEngine = "native";
     const bgAudio = document.getElementById("bgAudioEngine");
@@ -229,7 +230,7 @@
 
     function syncMediaSession(t) {
       if (!("mediaSession" in navigator) || !t) return;
-      const art = t.cover || "https://cdn-icons-png.flaticon.com/512/3844/3844724.png";
+      const art = (t.cover && t.cover.startsWith("http")) ? t.cover : "https://cdn-icons-png.flaticon.com/512/3844/3844724.png";
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: t.title || "VIBE Music",
@@ -330,6 +331,7 @@
       }, 9000);
     }
 
+    bgAudio.addEventListener("loadedmetadata", () => { if (queue[currentIndex]) syncMediaSession(queue[currentIndex]); updateMediaPosition(); });
     bgAudio.addEventListener("playing", () => {
       clearTimeout(stuckTimer);
       stuckTicks = 0;
