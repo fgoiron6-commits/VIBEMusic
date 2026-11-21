@@ -307,8 +307,6 @@
     async function resolveFullVideoId(track) {
       if (track.videoId && track.videoId.length === 11) return track.videoId;
       const q = `${track.title} ${track.artist} audio`;
-
-      // 1. Backend /api/search
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
@@ -318,11 +316,9 @@
         }
       } catch {}
 
-      // 2. Pencarian paralel tercepat (Piped + Invidious)
       const endpoints = [
         { url: `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
         { url: `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
-        { url: `https://api.piped.private.coffee/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
         { url: `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(q)}&type=video`, type: "inv" },
         { url: `https://yt.artemislena.eu/api/v1/search?q=${encodeURIComponent(q)}&type=video`, type: "inv" }
       ];
@@ -330,7 +326,7 @@
       try {
         const vid = await Promise.any(endpoints.map(async (ep) => {
           const ctrl = new AbortController();
-          const tmr = setTimeout(() => ctrl.abort(), 3500);
+          const tmr = setTimeout(() => ctrl.abort(), 3000);
           const r = await fetch(ep.url, { signal: ctrl.signal });
           clearTimeout(tmr);
           if (!r.ok) throw new Error("fail");
@@ -363,12 +359,13 @@
         const streamHosts = [
           { url: `https://inv.nadeko.net/api/v1/videos/${vid}`, type: "inv" },
           { url: `https://yt.artemislena.eu/api/v1/videos/${vid}`, type: "inv" },
-          { url: `https://pipedapi.kavin.rocks/streams/${vid}`, type: "piped" }
+          { url: `https://pipedapi.kavin.rocks/streams/${vid}`, type: "piped" },
+          { url: `https://pipedapi.adminforge.de/streams/${vid}`, type: "piped" }
         ];
         try {
           const stream = await Promise.any(streamHosts.map(async (sh) => {
             const ctrl = new AbortController();
-            const tmr = setTimeout(() => ctrl.abort(), 3500);
+            const tmr = setTimeout(() => ctrl.abort(), 3200);
             const r = await fetch(sh.url, { signal: ctrl.signal });
             clearTimeout(tmr);
             if (!r.ok) throw new Error("fail");
@@ -385,9 +382,8 @@
     }
 
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden && activeEngine === "yt" && isPlaying && ytPlayer?.playVideo) {
-        setTimeout(() => ytPlayer.playVideo(), 200);
-        setTimeout(() => ytPlayer.playVideo(), 700);
+      if (!document.hidden && isPlaying && activeEngine === "native" && bgAudio.paused && !bgAudio.ended) {
+        bgAudio.play().catch(() => {});
       }
     });
 
@@ -404,7 +400,7 @@
         const hero = qp[0] || tr[0], heroUid = registerTrack(hero);
         const topSix = [...tr.slice(0, 3), ...ch.slice(0, 3)];
         container.innerHTML = `
-          ${hero ? `<div class="hero-banner" onclick="selectTrackById('${heroUid}')"><img src="${escHtml(hero.cover)}" /><div class="hero-info"><div class="hero-tag">PILIHAN UTAMA HARI INI</div><div class="hero-title">${escHtml(hero.title)}</div><div class="hero-sub">${escHtml(hero.artist)} • Full Song</div></div><div class="hero-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>` : ""}
+          ${hero ? `<div class="hero-banner" onclick="selectTrackById('${heroUid}')"><img src="${escHtml(hero.cover)}" /><div class="hero-info"><div class="hero-tag">PILIHAN UTAMA HARI INI</div><div class="hero-title">${escHtml(hero.title)}</div><div class="hero-sub">${escHtml(hero.artist)} • Background Audio</div></div><div class="hero-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>` : ""}
           <div class="compact-grid">${topSix.map(t => { const u = registerTrack(t); return `<div class="compact-card" onclick="selectTrackById('${u}')"><img src="${escHtml(t.cover)}" /><div class="compact-title">${escHtml(t.title)}</div></div>`; }).join("")}</div>
           <div class="section"><div class="section-header"><span class="section-sub">PILIHAN CEPAT</span><span class="section-title">Quick picks</span></div><div class="quick-grid">${qp.map(t => renderSongRow(t)).join("")}</div></div>
           <div class="section"><div class="section-header"><span class="section-sub">LAGI POPULER</span><span class="section-title">Trending Indonesia</span></div><div class="cards-row">${tr.map(t => renderVCard(t)).join("")}</div></div>
@@ -420,7 +416,6 @@
 
     function selectTrackById(u) {
       const t = trackStore[u]; if (!t) return;
-      // Pancing izin autoplay browser tepat saat sentuhan jari pertama
       bgAudio.play().catch(() => {});
       const k = t.videoId || t.trackId || (t.title + t.artist);
       let idx = queue.findIndex(x => (x.videoId || x.trackId || (x.title + x.artist)) === k);
@@ -438,7 +433,7 @@
       document.getElementById("fpArt").src = track.cover;
       document.getElementById("fpTitle").textContent = track.title;
       document.getElementById("fpArtist").textContent = track.artist;
-      document.getElementById("streamSourceBadge").textContent = "MENCARI FULL SONG...";
+      document.getElementById("streamSourceBadge").textContent = "MENCARI AUDIO...";
       updateLikeIcon(); syncMediaSession(track);
 
       const vid = await resolveFullVideoId(track);
@@ -453,21 +448,9 @@
         try { await bgAudio.play(); return; } catch {}
       }
 
-      if (vid && ytReady && ytPlayer?.loadVideoById) {
-        activeEngine = "yt";
-        bgAudio.pause();
-        document.getElementById("streamSourceBadge").textContent = "FULL SONG • STREAM";
-        ytPlayer.loadVideoById(vid);
-        ytPlayer.playVideo();
-        return;
-      }
-
-      if (track.previewUrl) {
-        activeEngine = "native";
-        document.getElementById("streamSourceBadge").textContent = "AUDIO CADANGAN";
-        bgAudio.src = track.previewUrl;
-        bgAudio.play().catch(() => {});
-      }
+      // Jika stream audio tidak tersedia, langsung lanjut ke lagu berikutnya agar tidak macet
+      document.getElementById("streamSourceBadge").textContent = "LEWATI • STREAM SIBUK";
+      setTimeout(() => { if (currentIndex === idx) playNext(); }, 900);
     }
 
     function togglePlay() { if (activeEngine === "native") bgAudio.paused ? bgAudio.play() : bgAudio.pause(); else if (activeEngine === "yt" && ytReady && ytPlayer) isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo(); }
