@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from ytmusicapi import YTMusic
 import requests
+import os
+SOUNDSTAT_KEY = os.environ.get("SOUNDSTAT_API_KEY", "")
+RELATED_CACHE = {}
 
 app = Flask(__name__)
 CORS(app)
@@ -100,6 +103,52 @@ def search():
 
 @app.route("/api/related")
 def related():
+    vid = (request.args.get("videoId") or "").strip()
+    q = (request.args.get("q") or "").strip()
+    cache_key = vid or q.lower()
+    if cache_key in RELATED_CACHE:
+        return jsonify({"source": "cache", "results": RELATED_CACHE[cache_key]})
+
+    # 1. Coba rekomendasi SoundStat jika API Key terpasang & ada query/track
+    if SOUNDSTAT_KEY and q:
+        try:
+            sr = requests.get(
+                "https://soundstat.info/api/v1/tracks",
+                params={"q": q, "limit": 1},
+                headers={"X-API-Key": SOUNDSTAT_KEY},
+                timeout=3.5
+            )
+            if sr.ok:
+                items = sr.json().get("tracks") or sr.json().get("results") or []
+                if items and items[0].get("id"):
+                    tid = items[0]["id"]
+                    rr = requests.get(
+                        f"https://soundstat.info/api/v1/tracks/{tid}/recommendations",
+                        params={"limit": 12},
+                        headers={"X-API-Key": SOUNDSTAT_KEY},
+                        timeout=3.5
+                    )
+                    if rr.ok:
+                        rec_list = rr.json().get("tracks") or rr.json().get("recommendations") or []
+                        parsed_ss = []
+                        for t in rec_list:
+                            title = t.get("name") or t.get("title")
+                            artists = ", ".join([a.get("name", "") for a in (t.get("artists") or [])]) or t.get("artist", "")
+                            if title:
+                                parsed_ss.append({
+                                    "videoId": "",
+                                    "trackId": str(t.get("id", "")),
+                                    "title": title,
+                                    "artist": artists or "Unknown Artist",
+                                    "duration": "3:30",
+                                    "cover": t.get("image") or t.get("cover") or ""
+                                })
+                        if parsed_ss:
+                            RELATED_CACHE[cache_key] = parsed_ss
+                            return jsonify({"source": "soundstat", "results": parsed_ss})
+        except Exception:
+            pass
+
     vid = (request.args.get("videoId") or "").strip()
     q = (request.args.get("q") or "").strip()
     if yt and vid and len(vid) == 11:
