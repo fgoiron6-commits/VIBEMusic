@@ -444,146 +444,35 @@
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=${limit}&_t=${Date.now()}_${Math.random().toString(36).slice(2,7)}`, { cache: "no-store" });
         if (res.ok) {
-          const d = await res.json();
-          if (d.results && d.results.length > 0) return d.results;
-        }
-      } catch {}
-      const randOffset = Math.floor(Math.random() * 25); const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&offset=${randOffset}&country=ID&_t=${Date.now()}`, { cache: "no-store" });
-      const json = await itunes.json();
-      return (json.results || []).map(i => ({ videoId: "", trackId: String(i.trackId), title: i.trackName, artist: i.artistName, duration: fmtSec((i.trackTimeMillis || 0) / 1000), cover: (i.artworkUrl100 || "").replace("100x100bb", "500x500bb"), previewUrl: i.previewUrl || "" }));
-    }
-
-    async function resolveFullVideoId(track) {
-      if (track.videoId && track.videoId.length === 11) return track.videoId;
-      try {
-        const spRes = await fetch(`/api/resolve?title=${encodeURIComponent(track.title || "")}&artist=${encodeURIComponent(track.artist || "")}`);
-        if (spRes.ok) {
-          const spData = await spRes.json();
-          if (spData.directAudio) track.directAudio = spData.directAudio;
-          if (spData.videoId && spData.videoId.length === 11) return spData.videoId;
-        }
-      } catch {}
-      const q = `${track.title} ${track.artist} audio`;
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        if (res.ok) {
           const data = await res.json();
-          const hit = (data.results || []).find(x => x.videoId && x.videoId.length === 11);
-          if (hit) return hit.videoId;
+          if (data.results?.length) {
+            return data.results.map(t => ({
+              ...t,
+              cover: t.cover || "https://cdn-icons-png.flaticon.com/512/3844/3844724.png"
+            }));
+          }
         }
       } catch {}
 
-      const endpoints = [
-        { url: `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
-        { url: `https://pipedapi.adminforge.de/search?q=${encodeURIComponent(q)}&filter=music_songs`, type: "piped" },
-        { url: `https://inv.nadeko.net/api/v1/search?q=${encodeURIComponent(q)}&type=video`, type: "inv" },
-        { url: `https://yt.artemislena.eu/api/v1/search?q=${encodeURIComponent(q)}&type=video`, type: "inv" }
-      ];
-
+      // Fallback langsung dari browser ke Audius (100% Full Track)
       try {
-        const vid = await Promise.any(endpoints.map(async (ep) => {
-          const ctrl = new AbortController();
-          const tmr = setTimeout(() => ctrl.abort(), 3000);
-          const r = await fetch(ep.url, { signal: ctrl.signal });
-          clearTimeout(tmr);
-          if (!r.ok) throw new Error("fail");
-          const d = await r.json();
-          if (ep.type === "piped") {
-            const it = (d.items || []).find(i => i.url && i.url.includes("v="));
-            const id = it?.url?.split("v=")[1]?.slice(0, 11);
-            if (id && id.length === 11) return id;
-          } else {
-            const it = (d || []).find(v => v.videoId && v.videoId.length === 11);
-            if (it) return it.videoId;
-          }
-          throw new Error("empty");
-        }));
-        if (vid) return vid;
-      } catch {}
-      return null;
-    }
-
-    let playToken = 0;
-
-    async function resolveNativeAudio(track, vid) {
-      const q = `${track.title || ""} ${track.artist || ""}`.trim();
-
-      // Jalankan pencarian Audius klien & endpoint /api/audio server secara bersamaan (balapan tercepat)
-      const tasks = [
-        (async () => {
-          const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(q)}&limit=5`);
-          const json = await res.json();
-          const tLow = (track.title || "").toLowerCase();
-          const hit = (json.data || []).find(t => t.id && (!tLow || t.title.toLowerCase().includes(tLow.slice(0, 4)) || tLow.includes(t.title.toLowerCase().slice(0, 4))));
-          if (hit?.id) return { url: `https://discoveryprovider.audius.co/v1/tracks/${hit.id}/stream`, label: "BACKGROUND FULL • AUDIUS" };
-          throw new Error("no-audius");
-        })(),
-        (async () => {
-          const r = await fetch(`/api/audio?videoId=${encodeURIComponent(vid || "")}&title=${encodeURIComponent(track.title || "")}&artist=${encodeURIComponent(track.artist || "")}`);
-          if (!r.ok) throw new Error("no-server-audio");
-          const d = await r.json();
-          if (d.url && d.source !== "PREVIEW FALLBACK") return { url: d.url, label: `BACKGROUND • ${d.source}` };
-          throw new Error("only-preview");
-        })()
-      ];
-
-      try {
-        const fastest = await Promise.any(tasks);
-        if (fastest?.url) return fastest;
-      } catch {}
-
-      // Jika stream penuh sedang sibuk, pakai previewUrl agar musik tetap berbunyi tanpa error
-      if (track.previewUrl) {
-        return { url: track.previewUrl, label: "AUDIO CADANGAN • PREVIEW" };
+        const aud = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+        const aJson = await aud.json();
+        return (aJson.data || []).filter(t => t.id && (t.duration || 0) >= 60).map(t => {
+          const dur = Math.floor(t.duration || 0);
+          return {
+            videoId: "",
+            trackId: String(t.id),
+            title: t.title || "Unknown",
+            artist: t.user?.name || "Unknown Artist",
+            duration: `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")}`,
+            cover: t.artwork?.["480x480"] || t.artwork?.["150x150"] || "https://cdn-icons-png.flaticon.com/512/3844/3844724.png",
+            directAudio: `https://discoveryprovider.audius.co/v1/tracks/${t.id}/stream`
+          };
+        });
+      } catch {
+        return [];
       }
-
-      try {
-        const ir = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=1&country=ID`);
-        const ij = await ir.json();
-        const pUrl = ij.results?.[0]?.previewUrl;
-        if (pUrl) return { url: pUrl, label: "AUDIO CADANGAN • PREVIEW" };
-      } catch {}
-
-      return null;
-    }
-
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && isPlaying && activeEngine === "native" && bgAudio.paused && !bgAudio.ended) {
-        bgAudio.play().catch(() => {});
-      }
-    });
-
-    let isShuffle = true, repeatMode = 0; // 0: off, 1: repeat queue, 2: repeat one
-
-    function shuffleArr(arr) {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    function toggleShuffle() {
-      isShuffle = !isShuffle;
-      document.getElementById("shuffleBtn").style.color = isShuffle ? "#FF0055" : "#9e9ea8";
-      if (isShuffle && queue.length > 1) {
-        const cur = queue[currentIndex];
-        const rest = shuffleArr(queue.filter((_, i) => i !== currentIndex));
-        queue = cur ? [cur, ...rest] : rest;
-        currentIndex = cur ? 0 : -1;
-      }
-    }
-
-    function toggleRepeat() {
-      repeatMode = (repeatMode + 1) % 3;
-      const el = document.getElementById("repeatBtn");
-      el.style.color = repeatMode > 0 ? "#FF0055" : "#9e9ea8";
-    }
-
-    function playMixAll(startIdx = 0) {
-      if (!queue.length) return;
-      playAtIndex(startIdx);
     }
 
     window.addEventListener("DOMContentLoaded", async () => {

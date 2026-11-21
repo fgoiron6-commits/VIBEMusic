@@ -12,26 +12,12 @@ SOUNDSTAT_KEY = os.environ.get("SOUNDSTAT_API_KEY", "")
 JAMENDO_CLIENT_ID = os.environ.get("JAMENDO_CLIENT_ID", "56d30c95")
 
 RELATED_CACHE = {}
-AUDIO_CACHE = {}
+RESOLVE_CACHE = {}
 
 AUDIUS_NODES = [
     "https://discoveryprovider.audius.co",
     "https://discoveryprovider2.audius.co",
     "https://discoveryprovider3.audius.co"
-]
-
-PIPED_INSTANCES = [
-    "https://pipedapi.kavin.rocks",
-    "https://pipedapi.adminforge.de",
-    "https://pipedapi.leptons.xyz",
-    "https://api.piped.private.coffee"
-]
-
-INV_INSTANCES = [
-    "https://inv.nadeko.net",
-    "https://yt.artemislena.eu",
-    "https://invidious.nerdvpn.de",
-    "https://invidious.jing.rocks"
 ]
 
 try:
@@ -45,21 +31,21 @@ def add_no_cache_headers(response):
     response.headers["Pragma"] = "no-cache"
     return response
 
-def search_audius_tracks(query, limit=10):
+def search_audius_tracks(query, limit=12):
     out = []
     node = random.choice(AUDIUS_NODES)
     try:
         r = requests.get(
             f"{node}/v1/tracks/search",
             params={"query": query, "limit": limit},
-            timeout=3.2
+            timeout=3.5
         )
         if r.ok:
             for item in r.json().get("data", []):
                 tid = item.get("id")
-                if not tid:
-                    continue
                 dur = int(item.get("duration") or 0)
+                if not tid or dur < 60:
+                    continue
                 art = (item.get("artwork") or {}).get("480x480") or (item.get("artwork") or {}).get("150x150") or ""
                 out.append({
                     "videoId": "",
@@ -74,7 +60,7 @@ def search_audius_tracks(query, limit=10):
         pass
     return out
 
-def search_jamendo_tracks(query, limit=8):
+def search_jamendo_tracks(query, limit=10):
     out = []
     try:
         r = requests.get(
@@ -86,14 +72,14 @@ def search_jamendo_tracks(query, limit=8):
                 "search": query,
                 "audioformat": "mp32"
             },
-            timeout=3.0
+            timeout=3.2
         )
         if r.ok:
             for item in r.json().get("results", []):
                 aud = item.get("audio")
-                if not aud:
-                    continue
                 dur = int(item.get("duration") or 180)
+                if not aud or dur < 60:
+                    continue
                 out.append({
                     "videoId": "",
                     "trackId": f"jam_{item.get('id', '')}",
@@ -107,47 +93,16 @@ def search_jamendo_tracks(query, limit=8):
         pass
     return out
 
-def fallback_catalog(query, limit=18):
-    results = search_audius_tracks(query, min(limit, 8))
+def full_catalog_fallback(query, limit=20):
+    results = search_audius_tracks(query, limit)
     if len(results) < limit:
-        try:
-            offset = random.randint(0, 20)
-            r = requests.get(
-                "https://itunes.apple.com/search",
-                params={"term": query, "media": "music", "entity": "song", "limit": limit, "offset": offset, "country": "ID"},
-                timeout=3.5
-            )
-            if r.ok:
-                for item in r.json().get("results", []):
-                    ms = int(item.get("trackTimeMillis") or 0) // 1000
-                    results.append({
-                        "videoId": "",
-                        "trackId": str(item.get("trackId", "")),
-                        "title": item.get("trackName", "Unknown"),
-                        "artist": item.get("artistName", "Unknown Artist"),
-                        "duration": f"{ms // 60}:{ms % 60:02d}",
-                        "cover": (item.get("artworkUrl100") or "").replace("100x100bb", "500x500bb"),
-                        "previewUrl": item.get("previewUrl", "")
-                    })
-        except Exception:
-            pass
-    if len(results) < 5:
-        results.extend(search_jamendo_tracks(query, 6))
+        results.extend(search_jamendo_tracks(query, limit - len(results)))
     return results[:limit]
-
-@app.route("/api/health")
-def health():
-    return jsonify({
-        "status": "ok",
-        "ytmusicapi": bool(yt),
-        "soundstat": bool(SOUNDSTAT_KEY),
-        "audius_nodes": len(AUDIUS_NODES)
-    })
 
 @app.route("/api/search")
 def search():
     q = (request.args.get("q") or "").strip()
-    limit = int(request.args.get("limit") or 18)
+    limit = int(request.args.get("limit") or 20)
     if not q:
         return jsonify({"results": []})
 
@@ -157,7 +112,7 @@ def search():
             parsed = []
             for s in raw:
                 vid = s.get("videoId")
-                if not vid:
+                if not vid or len(vid) != 11:
                     continue
                 artists = ", ".join([a.get("name", "") for a in (s.get("artists") or []) if a.get("name")]) or "Unknown Artist"
                 thumbs = s.get("thumbnails") or []
@@ -176,94 +131,46 @@ def search():
         except Exception:
             pass
 
-    return jsonify({"source": "fallback", "results": fallback_catalog(q, limit)})
+    return jsonify({"source": "full-fallback", "results": full_catalog_fallback(q, limit)})
 
-@app.route("/api/audio")
-def get_audio_url():
-    vid = (request.args.get("videoId") or "").strip()
+@app.route("/api/resolve")
+def resolve_full_track():
     title = (request.args.get("title") or "").strip()
     artist = (request.args.get("artist") or "").strip()
+    if not title:
+        return jsonify({"error": "missing title"}), 400
+
+    cache_key = f"{title.lower()}::{artist.lower()}"
+    if cache_key in RESOLVE_CACHE:
+        return jsonify(RESOLVE_CACHE[cache_key])
+
     q = f"{title} {artist}".strip()
-    cache_key = vid or q.lower()
+    best_vid = ""
+    direct_audio = ""
 
-    if cache_key in AUDIO_CACHE:
-        return jsonify(AUDIO_CACHE[cache_key])
-
-    # 1. Audius Multi-Node
-    if q:
-        aud_hits = search_audius_tracks(q, 5)
-        t_low = title.lower()
-        for item in aud_hits:
-            name = (item.get("title") or "").lower()
-            if item.get("directAudio") and (not t_low or t_low[:4] in name or name[:4] in t_low):
-                res = {"url": item["directAudio"], "source": "AUDIUS FULL"}
-                AUDIO_CACHE[cache_key] = res
-                return jsonify(res)
-
-    # 2. Resolve videoId via ytmusicapi jika kosong
-    if (not vid or len(vid) != 11) and yt and q:
+    if yt:
         try:
-            hits = yt.search(q, filter="songs", limit=2)
-            if hits and hits[0].get("videoId"):
-                vid = hits[0]["videoId"]
+            hits = yt.search(q, filter="songs", limit=3)
+            for h in hits:
+                vid = h.get("videoId")
+                if vid and len(vid) == 11:
+                    best_vid = vid
+                    break
         except Exception:
             pass
 
-    # 3. Invidious & Piped Multi-Instance
-    if vid and len(vid) == 11:
-        inv_pool = list(INV_INSTANCES)
-        random.shuffle(inv_pool)
-        for base in inv_pool[:3]:
-            try:
-                r = requests.get(f"{base}/api/v1/videos/{vid}", timeout=2.6)
-                if r.ok:
-                    for f in (r.json().get("adaptiveFormats") or []):
-                        mime = f.get("type") or ""
-                        if ("audio/mp4" in mime or "audio/webm" in mime) and f.get("url"):
-                            res = {"url": f["url"], "source": "STREAM FULL", "videoId": vid}
-                            AUDIO_CACHE[cache_key] = res
-                            return jsonify(res)
-            except Exception:
-                continue
+    aud_hits = search_audius_tracks(q, 5)
+    t_low = title.lower()
+    for item in aud_hits:
+        name = (item.get("title") or "").lower()
+        if item.get("directAudio") and (t_low[:5] in name or name[:5] in t_low):
+            direct_audio = item["directAudio"]
+            break
 
-        piped_pool = list(PIPED_INSTANCES)
-        random.shuffle(piped_pool)
-        for base in piped_pool[:3]:
-            try:
-                r = requests.get(f"{base}/streams/{vid}", timeout=2.6)
-                if r.ok:
-                    for f in (r.json().get("audioStreams") or []):
-                        if f.get("url"):
-                            res = {"url": f["url"], "source": "STREAM FULL", "videoId": vid}
-                            AUDIO_CACHE[cache_key] = res
-                            return jsonify(res)
-            except Exception:
-                continue
-
-    # 4. Jamendo Full Track Fallback
-    if q:
-        jam_hits = search_jamendo_tracks(q, 2)
-        if jam_hits and jam_hits[0].get("directAudio"):
-            res = {"url": jam_hits[0]["directAudio"], "source": "JAMENDO FULL"}
-            AUDIO_CACHE[cache_key] = res
-            return jsonify(res)
-
-    # 5. iTunes Preview Terakhir
-    if q:
-        try:
-            ir = requests.get(
-                "https://itunes.apple.com/search",
-                params={"term": q, "media": "music", "entity": "song", "limit": 1, "country": "ID"},
-                timeout=2.4
-            )
-            if ir.ok:
-                items = ir.json().get("results") or []
-                if items and items[0].get("previewUrl"):
-                    return jsonify({"url": items[0]["previewUrl"], "source": "PREVIEW CADANGAN"})
-        except Exception:
-            pass
-
-    return jsonify({"error": "unavailable"}), 404
+    res = {"videoId": best_vid, "directAudio": direct_audio}
+    if best_vid or direct_audio:
+        RESOLVE_CACHE[cache_key] = res
+    return jsonify(res)
 
 @app.route("/api/related")
 def related():
@@ -340,7 +247,7 @@ def related():
         except Exception:
             pass
 
-    return jsonify({"source": "fallback", "results": fallback_catalog(q or "global viral hits 2026", 16)})
+    return jsonify({"source": "full-fallback", "results": full_catalog_fallback(q or "top hits 2026", 16)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
