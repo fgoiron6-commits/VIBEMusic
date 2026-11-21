@@ -454,6 +454,24 @@
         }
       } catch {}
 
+      // Fallback metadata lengkap dari iTunes (artis major label lengkap, diputar full via resolver)
+      try {
+        const it = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
+        const iJson = await it.json();
+        const itList = (iJson.results || []).map(item => {
+          const sec = Math.floor((item.trackTimeMillis || 210000) / 1000);
+          return {
+            videoId: "",
+            trackId: `it_${item.trackId || Math.random()}`,
+            title: item.trackName || "Unknown",
+            artist: item.artistName || "Unknown Artist",
+            duration: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`,
+            cover: (item.artworkUrl100 || "").replace("100x100bb", "500x500bb")
+          };
+        });
+        if (itList.length) return itList;
+      } catch {}
+
       // Fallback langsung dari browser ke Audius (100% Full Track)
       try {
         const aud = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(query)}&limit=${limit}`);
@@ -1061,6 +1079,64 @@
         stuckCounter = 0;
       }
     }, 1000);
+
+
+    // === PATCH ANTI-BUG KLIK HASIL SEARCH & KARTU LAGU ===
+    window.searchTracksCache = [];
+
+    window.playFromSearchIndex = function(i) {
+      const item = window.searchTracksCache[i];
+      if (!item) return;
+      const existIdx = queue.findIndex(x => x.title === item.title && x.artist === item.artist);
+      if (existIdx !== -1) {
+        playAtIndex(existIdx);
+      } else {
+        const insertIdx = currentIndex >= 0 ? currentIndex + 1 : 0;
+        queue.splice(insertIdx, 0, item);
+        playAtIndex(insertIdx);
+      }
+    };
+
+    const searchInputEl = document.getElementById("searchInput");
+    const searchResultsEl = document.getElementById("searchResults");
+    if (searchInputEl && searchResultsEl) {
+      let sTimer = null;
+      const runSafeSearch = async () => {
+        const q = searchInputEl.value.trim();
+        if (!q) {
+          searchResultsEl.innerHTML = '<div class="loader">Ketik nama artis atau judul lagu (contoh: Daniel Caesar, Tulus, SZA)...</div>';
+          return;
+        }
+        searchResultsEl.innerHTML = '<div class="loader">Mencari "' + escHtml(q) + '"...</div>';
+        const items = await fetchCatalog(q, 24);
+        window.searchTracksCache = items;
+        if (!items.length) {
+          searchResultsEl.innerHTML = '<div class="loader">Tidak ada hasil ditemukan.</div>';
+          return;
+        }
+        searchResultsEl.innerHTML = items.map((t, idx) => `
+          <div class="v-row" data-sidx="${idx}" onclick="window.playFromSearchIndex(${idx})" style="cursor:pointer;">
+            <img src="${escHtml(t.cover)}" loading="lazy" />
+            <div class="v-meta">
+              <div class="v-title">${escHtml(t.title)}</div>
+              <div class="v-sub">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
+            </div>
+            <button type="button" class="play-all-btn" onclick="event.stopPropagation(); window.playFromSearchIndex(${idx})">Putar</button>
+          </div>
+        `).join("");
+      };
+
+      searchInputEl.oninput = () => {
+        clearTimeout(sTimer);
+        sTimer = setTimeout(runSafeSearch, 380);
+      };
+      searchInputEl.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          clearTimeout(sTimer);
+          runSafeSearch();
+        }
+      };
+    }
 
   </script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
