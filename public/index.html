@@ -92,6 +92,38 @@
     .shortcut-card { position:relative; aspect-ratio:1/1; border-radius:8px; overflow:hidden; background:var(--elev); cursor:pointer; }
     .shortcut-card img { width:100%; height:100%; object-fit:cover; display:block; }
     .shortcut-label { position:absolute; inset:auto 0 0 0; padding:18px 8px 7px; background:linear-gradient(transparent,rgba(0,0,0,0.85)); font-size:0.76rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .fp-drawer { display:none; position:fixed; inset:0; background:linear-gradient(180deg,#12192c 0%,#06080f 45%,#030303 100%); padding:14px 0 0; z-index:90; flex-direction:column; }
+    .qd-mini-head { display:flex; align-items:center; gap:12px; padding:4px 16px 12px; }
+    .qd-mini-head img { width:44px; height:44px; border-radius:6px; object-fit:cover; flex-shrink:0; }
+    .qd-mini-meta { flex:1; min-width:0; }
+    .qd-mini-title { font-size:0.95rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .qd-mini-artist { font-size:0.78rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .qd-tabs { display:flex; border-bottom:1px solid rgba(255,255,255,0.1); padding:0 16px; }
+    .qd-tab { flex:1; background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); font-size:0.8rem; font-weight:700; padding:10px 4px; cursor:pointer; letter-spacing:0.4px; }
+    .qd-tab.active { color:#ffffff; border-bottom-color:#ffffff; }
+    .fp-drawer-body { flex:1; overflow-y:auto; padding:8px 0 28px; white-space:normal; line-height:1.4; }
+    .q-item { display:flex; align-items:center; gap:12px; padding:8px 16px; cursor:pointer; }
+    .q-item.active-song { background:rgba(255,255,255,0.09); }
+    .q-item img { width:46px; height:46px; border-radius:6px; object-fit:cover; flex-shrink:0; }
+    .q-item-meta { flex:1; min-width:0; }
+    .q-item-title { font-size:0.9rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .q-item-sub { font-size:0.76rem; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .q-drag { color:var(--muted); font-size:1.1rem; padding-left:6px; flex-shrink:0; letter-spacing:1px; }
+    .autoplay-box { padding:16px 16px 8px; margin-top:6px; border-top:1px solid rgba(255,255,255,0.07); }
+    .autoplay-top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .autoplay-title { font-size:0.95rem; font-weight:700; }
+    .autoplay-sub { font-size:0.76rem; color:var(--muted); margin-top:2px; }
+    .switch { position:relative; display:inline-block; width:42px; height:24px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider-round { position:absolute; cursor:pointer; inset:0; background:#3a3a45; border-radius:99px; transition:0.25s; }
+    .slider-round:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:0.25s; }
+    .switch input:checked + .slider-round { background:#ffffff; }
+    .switch input:checked + .slider-round:before { transform:translateX(18px); background:#0b0f19; }
+    .q-chips { display:flex; gap:8px; overflow-x:auto; padding:12px 0 8px; scrollbar-width:none; }
+    .q-chips::-webkit-scrollbar { display:none; }
+    .q-chip { background:rgba(255,255,255,0.1); border:none; color:#fff; padding:6px 13px; border-radius:8px; font-size:0.78rem; font-weight:600; white-space:nowrap; cursor:pointer; }
+    .q-chip.active { background:#ffffff; color:#0b0f19; }
   </style>
 </head>
 <body>
@@ -168,7 +200,20 @@
   </div>
 
   <div class="fp-drawer" id="fpDrawer">
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;"><strong id="drawerTitle">LYRICS</strong><button class="icon-btn" onclick="closeDrawer()" style="font-size:0.85rem;font-weight:700;">TUTUP</button></div>
+    <div class="qd-mini-head">
+      <img id="qdCover" src="" alt="" onclick="closeDrawer()" />
+      <div class="qd-mini-meta" onclick="closeDrawer()">
+        <div class="qd-mini-title" id="qdTitle">Judul Lagu</div>
+        <div class="qd-mini-artist" id="qdArtist">Artis</div>
+      </div>
+      <button class="icon-btn" onclick="togglePlay()" id="qdPlayBtn"></button>
+      <button class="icon-btn" onclick="closeDrawer()"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg></button>
+    </div>
+    <div class="qd-tabs">
+      <button class="qd-tab" id="tabBtnQueue" onclick="openDrawer('queue')">BERIKUTNYA</button>
+      <button class="qd-tab" id="tabBtnLyrics" onclick="openDrawer('lyrics')">LIRIK</button>
+      <button class="qd-tab" id="tabBtnRelated" onclick="openDrawer('related')">TERKAIT</button>
+    </div>
     <div class="fp-drawer-body" id="drawerBody"></div>
   </div>
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -578,7 +623,7 @@
       }
     }
     function playPrev() { if (queue.length) playAtIndex((currentIndex - 1 + queue.length) % queue.length); }
-    function updatePlayIcons() { const ic = isPlaying ? ICON_PAUSE : ICON_PLAY; document.getElementById("miniPlayBtn").innerHTML = ic; document.getElementById("fpPlayBtn").innerHTML = ic; }
+    function updatePlayIcons() { const ic = isPlaying ? ICON_PAUSE : ICON_PLAY; document.getElementById("miniPlayBtn").innerHTML = ic; document.getElementById("fpPlayBtn").innerHTML = ic; const qdp = document.getElementById("qdPlayBtn"); if (qdp) qdp.innerHTML = ic; }
     function openSearch() { document.getElementById("brandLogo").style.display = "none"; document.getElementById("topActions").style.display = "none"; document.getElementById("searchWrap").classList.add("active"); document.getElementById("searchInput").focus(); switchTab("search"); }
     function closeSearch() { document.getElementById("brandLogo").style.display = "flex"; document.getElementById("topActions").style.display = "flex"; document.getElementById("searchWrap").classList.remove("active"); switchTab("home"); }
     async function doSearch(cq) {
@@ -613,27 +658,127 @@
       document.getElementById("likeBtn").style.color = likedSongs.some(x => (x.videoId || x.trackId || (x.title + x.artist)) === k) ? "#FF0055" : "#ffffff";
     }
     function renderLibrary() { const box = document.getElementById("libraryList"); box.innerHTML = likedSongs.length ? likedSongs.map((t, i) => renderNumberedRow(t, i + 1)).join("") : '<div class="loader">Belum ada lagu yang disukai.</div>'; }
+    let autoPlaySimilar = true, autoPlayList = [];
+
+    function toggleAutoPlay(checked) {
+      autoPlaySimilar = checked;
+      const box = document.getElementById("autoPlayItemsWrap");
+      if (box) box.style.display = checked ? "block" : "none";
+    }
+
+    async function loadAutoPlayFilter(el, query) {
+      document.querySelectorAll(".q-chip").forEach(c => c.classList.remove("active"));
+      if (el) el.classList.add("active");
+      const wrap = document.getElementById("autoPlayItemsWrap");
+      if (!wrap) return;
+      wrap.innerHTML = '<div class="loader" style="padding:20px;">Memuat lagu serupa...</div>';
+      try {
+        const cur = queue[currentIndex] || {};
+        const q = query || `${cur.artist || "Daniel Caesar NIKI"} mix`;
+        const items = await fetchCatalog(q, 14);
+        autoPlayList = items;
+        wrap.innerHTML = items.map(t => {
+          const u = registerTrack(t);
+          return `<div class="q-item" onclick="selectTrackById('${u}'); openDrawer('queue');">
+            <img src="${escHtml(t.cover)}" loading="lazy" />
+            <div class="q-item-meta">
+              <div class="q-item-title">${escHtml(t.title)}</div>
+              <div class="q-item-sub">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
+            </div>
+            <span class="q-drag">=</span>
+          </div>`;
+        }).join("");
+      } catch {
+        wrap.innerHTML = '<div class="loader" style="padding:20px;">Gagal memuat daftar putar otomatis.</div>';
+      }
+    }
+
     async function openDrawer(type) {
-      const d = document.getElementById("fpDrawer"), title = document.getElementById("drawerTitle"), body = document.getElementById("drawerBody");
+      const d = document.getElementById("fpDrawer");
+      const body = document.getElementById("drawerBody");
       d.style.display = "flex";
+
+      const cur = queue[currentIndex] || {};
+      document.getElementById("qdCover").src = cur.cover || "";
+      document.getElementById("qdTitle").textContent = cur.title || "VIBE Music";
+      document.getElementById("qdArtist").textContent = cur.artist || "";
+      document.getElementById("qdPlayBtn").innerHTML = isPlaying ? ICON_PAUSE : ICON_PLAY;
+
+      document.getElementById("tabBtnQueue").classList.toggle("active", type === "queue");
+      document.getElementById("tabBtnLyrics").classList.toggle("active", type === "lyrics");
+      document.getElementById("tabBtnRelated").classList.toggle("active", type === "related");
+
       if (type === "queue") {
-        title.textContent = "BERIKUTNYA (ANTREAN)";
-        body.innerHTML = queue.map((t, i) => `<div class="song-row" onclick="playAtIndex(${i});closeDrawer();" style="margin-bottom:6px;"><img src="${escHtml(t.cover)}" /><div class="song-meta"><div class="song-title ${i===currentIndex?'playing-text':''}">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`).join("");
+        const startSlice = Math.max(0, currentIndex - 2);
+        const visibleQueue = queue.slice(startSlice, startSlice + 6);
+        body.innerHTML = `
+          <div>
+            ${visibleQueue.map((t, offset) => {
+              const realIdx = startSlice + offset;
+              const isAct = realIdx === currentIndex;
+              return `<div class="q-item ${isAct ? 'active-song' : ''}" onclick="playAtIndex(${realIdx}); openDrawer('queue');">
+                <img src="${escHtml(t.cover)}" />
+                <div class="q-item-meta">
+                  <div class="q-item-title">${escHtml(t.title)}</div>
+                  <div class="q-item-sub">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
+                </div>
+                <span class="q-drag">=</span>
+              </div>`;
+            }).join("")}
+          </div>
+
+          <div class="autoplay-box">
+            <div class="autoplay-top">
+              <div>
+                <div class="autoplay-title">Putar otomatis</div>
+                <div class="autoplay-sub">Tambahkan konten serupa agar pemutaran tidak berhenti</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" ${autoPlaySimilar ? "checked" : ""} onchange="toggleAutoPlay(this.checked)" />
+                <span class="slider-round"></span>
+              </label>
+            </div>
+            <div class="q-chips">
+              <button class="q-chip active" onclick="loadAutoPlayFilter(this, '')">Semua</button>
+              <button class="q-chip" onclick="loadAutoPlayFilter(this, 'Gracie Abrams NIKI LANY SZA')">Populer</button>
+              <button class="q-chip" onclick="loadAutoPlayFilter(this, 'Top Hits Global Pop 2026')">Musik Populer</button>
+              <button class="q-chip" onclick="loadAutoPlayFilter(this, 'The Smiths Hotel Ugly indie chill')">Temukan</button>
+              <button class="q-chip" onclick="loadAutoPlayFilter(this, 'Tulus Nadin Amizah Hindia')">Musik Ku</button>
+            </div>
+          </div>
+          <div id="autoPlayItemsWrap" style="display:${autoPlaySimilar ? 'block' : 'none'};"></div>
+        `;
+        if (autoPlaySimilar) loadAutoPlayFilter(null, "");
       } else if (type === "related") {
-        title.textContent = "LAGU TERKAIT";
         if (currentIndex < 0) return;
-        const cur = queue[currentIndex];
-        body.textContent = "Mencari lagu terkait...";
+        body.innerHTML = '<div class="loader">Mencari lagu terkait...</div>';
         try {
-          const relRes = await fetch(`/api/related?videoId=${encodeURIComponent(cur.videoId || "")}&q=${encodeURIComponent(cur.artist + " mix")}`); const rel = (await relRes.json()).results || [];
+          const relRes = await fetch(`/api/related?videoId=${encodeURIComponent(cur.videoId || "")}&q=${encodeURIComponent(cur.artist + " mix")}`);
+          const rel = (await relRes.json()).results || [];
           body.innerHTML = rel.map((t, i) => {
             const u = registerTrack(t);
-            return `<div class="song-row" onclick="selectTrackById('${u}');closeDrawer();" style="margin-bottom:6px;"><span class="track-num">${i+1}</span><img src="${escHtml(t.cover)}" /><div class="song-meta"><div class="song-title">${escHtml(t.title)}</div><div class="song-artist">${escHtml(t.artist)}</div></div><span class="song-dur">${escHtml(t.duration)}</span></div>`;
+            return `<div class="q-item" onclick="selectTrackById('${u}'); openDrawer('queue');">
+              <span class="track-num">${i + 1}</span>
+              <img src="${escHtml(t.cover)}" />
+              <div class="q-item-meta">
+                <div class="q-item-title">${escHtml(t.title)}</div>
+                <div class="q-item-sub">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
+              </div>
+              <span class="q-drag">=</span>
+            </div>`;
           }).join("");
-        } catch { body.textContent = "Gagal memuat lagu terkait."; }
+        } catch {
+          body.innerHTML = '<div class="loader">Gagal memuat lagu terkait.</div>';
+        }
       } else {
-        title.textContent = "LIRIK LAGU"; if (currentIndex < 0) return; const t = queue[currentIndex]; body.textContent = "Mencari lirik...";
-        try { const data = await (await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(t.artist)}&track_name=${encodeURIComponent(t.title)}`)).json(); body.textContent = data.plainLyrics || "Lirik tidak tersedia."; } catch { body.textContent = "Lirik tidak ditemukan."; }
+        if (currentIndex < 0) return;
+        body.innerHTML = '<div class="loader">Mencari lirik...</div>';
+        try {
+          const data = await (await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(cur.artist)}&track_name=${encodeURIComponent(cur.title)}`)).json();
+          body.innerHTML = `<div style="padding:16px 22px; white-space:pre-line; line-height:1.8; color:#e5e5ea; font-size:0.95rem;">${escHtml(data.plainLyrics || "Lirik tidak tersedia untuk lagu ini.")}</div>`;
+        } catch {
+          body.innerHTML = '<div class="loader">Lirik tidak ditemukan.</div>';
+        }
       }
     }
     function closeDrawer() { document.getElementById("fpDrawer").style.display = "none"; }
