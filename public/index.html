@@ -153,6 +153,37 @@
     .drawer-box { margin-top: 12px; max-height: 240px; overflow-y: auto; }
     .lyrics-text { white-space: pre-line; font-size: 14px; line-height: 1.65; color: #e2e2e2; text-align: center; padding: 10px; }
   
+    .sync-wrap { display: flex; flex-direction: column; gap: 10px; padding: 20px 10px 56px; }
+    .sync-line {
+      position: relative;
+      font-size: 15px; font-weight: 600; line-height: 1.5;
+      color: rgba(255, 255, 255, 0.24);
+      text-align: center; cursor: pointer;
+      transition: all 0.25s ease;
+      padding: 7px 14px; border-radius: 14px;
+      background: transparent;
+    }
+    .sync-line.past {
+      color: rgba(255, 255, 255, 0.44);
+    }
+    .sync-line.active {
+      color: #ffffff;
+      font-size: 19px; font-weight: 800;
+      background: linear-gradient(90deg, rgba(255, 0, 85, 0.28), rgba(255, 110, 160, 0.22), rgba(255, 0, 85, 0.28));
+      border: 1px solid rgba(255, 92, 148, 0.65);
+      box-shadow: 0 6px 24px rgba(255, 0, 85, 0.35);
+      text-shadow: 0 0 14px rgba(255, 120, 165, 0.75);
+      transform: scale(1.03);
+    }
+    .sync-line.active::before {
+      content: "●";
+      color: #FF2A70;
+      margin-right: 8px;
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    .lyrics-text { white-space: pre-line; font-size: 14px; line-height: 1.65; color: #e2e2e2; text-align: center; padding: 10px; }
+  
     .sync-wrap { display: flex; flex-direction: column; gap: 12px; padding: 18px 8px 48px; }
     .sync-line {
       font-size: 16px; font-weight: 700; line-height: 1.45; color: rgba(255,255,255,0.34);
