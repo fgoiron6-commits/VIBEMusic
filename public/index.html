@@ -225,14 +225,80 @@
     const ICON_PLAY = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
     const ICON_PAUSE = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
 
+    let userPaused = false;
+
     function syncMediaSession(t) {
       if (!("mediaSession" in navigator) || !t) return;
-      navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, album: "VIBE Music", artwork: [{ src: t.cover, sizes: "512x512", type: "image/jpeg" }] });
-      navigator.mediaSession.setActionHandler("play", () => { if (!isPlaying) togglePlay(); });
-      navigator.mediaSession.setActionHandler("pause", () => { if (isPlaying) togglePlay(); });
-      navigator.mediaSession.setActionHandler("previoustrack", playPrev);
-      navigator.mediaSession.setActionHandler("nexttrack", playNext);
+      const art = t.cover || "https://cdn-icons-png.flaticon.com/512/3844/3844724.png";
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.title || "VIBE Music",
+          artist: t.artist || "Unknown Artist",
+          album: "VIBE Music",
+          artwork: [
+            { src: art, sizes: "96x96", type: "image/jpeg" },
+            { src: art, sizes: "192x192", type: "image/jpeg" },
+            { src: art, sizes: "512x512", type: "image/jpeg" }
+          ]
+        });
+      } catch {}
+
+      navigator.mediaSession.setActionHandler("play", async () => {
+        userPaused = false;
+        if (activeEngine === "native") {
+          try { await bgAudio.play(); } catch {}
+        } else if (activeEngine === "yt" && ytReady && ytPlayer) {
+          ytPlayer.playVideo();
+        }
+        isPlaying = true;
+        updatePlayIcons();
+        navigator.mediaSession.playbackState = "playing";
+      });
+
+      navigator.mediaSession.setActionHandler("pause", () => {
+        userPaused = true;
+        if (activeEngine === "native") {
+          bgAudio.pause();
+        } else if (activeEngine === "yt" && ytReady && ytPlayer) {
+          ytPlayer.pauseVideo();
+        }
+        isPlaying = false;
+        updatePlayIcons();
+        navigator.mediaSession.playbackState = "paused";
+      });
+
+      navigator.mediaSession.setActionHandler("previoustrack", () => {
+        userPaused = false;
+        playPrev();
+      });
+
+      navigator.mediaSession.setActionHandler("nexttrack", () => {
+        userPaused = false;
+        playNext();
+      });
+
+      navigator.mediaSession.setActionHandler("seekto", (d) => {
+        if (d.seekTime != null && activeEngine === "native" && bgAudio.duration) {
+          bgAudio.currentTime = d.seekTime;
+          updateMediaPosition();
+        }
+      });
     }
+
+    function updateMediaPosition() {
+      if ("mediaSession" in navigator && "setPositionState" in navigator.mediaSession) {
+        if (activeEngine === "native" && bgAudio.duration && !isNaN(bgAudio.duration) && isFinite(bgAudio.duration)) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: bgAudio.duration,
+              playbackRate: bgAudio.playbackRate || 1,
+              position: Math.min(bgAudio.currentTime || 0, bgAudio.duration)
+            });
+          } catch {}
+        }
+      }
+    }
+
     function registerTrack(t) { const uid = "trk_" + Math.random().toString(36).slice(2, 10); trackStore[uid] = t; return uid; }
     function escHtml(s) { return String(s || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
@@ -267,9 +333,12 @@
     bgAudio.addEventListener("playing", () => {
       clearTimeout(stuckTimer);
       stuckTicks = 0;
+      userPaused = false;
       if (activeEngine === "native") {
         isPlaying = true;
         updatePlayIcons();
+        if (queue[currentIndex]) syncMediaSession(queue[currentIndex]);
+        updateMediaPosition();
         if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
       }
     });
@@ -287,8 +356,8 @@
     bgAudio.addEventListener("pause", () => {
       if (activeEngine === "native") {
         if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
-        if (!bgAudio.ended && isPlaying && document.hidden) {
-          setTimeout(() => { if (isPlaying && bgAudio.paused) bgAudio.play().catch(() => {}); }, 300);
+        if (!bgAudio.ended && !userPaused && isPlaying && document.hidden) {
+          setTimeout(() => { if (!userPaused && isPlaying && bgAudio.paused) bgAudio.play().catch(() => {}); }, 300);
           return;
         }
         isPlaying = false;
@@ -610,7 +679,15 @@
       setTimeout(() => { if (currentIndex === idx) playNext(); }, 900);
     }
 
-    function togglePlay() { if (activeEngine === "native") bgAudio.paused ? bgAudio.play() : bgAudio.pause(); else if (activeEngine === "yt" && ytReady && ytPlayer) isPlaying ? ytPlayer.pauseVideo() : ytPlayer.playVideo(); }
+    function togglePlay() {
+      if (activeEngine === "native") {
+        if (bgAudio.paused) { userPaused = false; bgAudio.play().catch(() => {}); }
+        else { userPaused = true; bgAudio.pause(); }
+      } else if (activeEngine === "yt" && ytReady && ytPlayer) {
+        if (isPlaying) { userPaused = true; ytPlayer.pauseVideo(); }
+        else { userPaused = false; ytPlayer.playVideo(); }
+      }
+    }
     function playNext() {
       if (!queue.length) return;
       if (repeatMode === 2 && currentIndex >= 0) { playAtIndex(currentIndex); return; }
