@@ -9,6 +9,7 @@ CORS(app)
 
 SOUNDSTAT_KEY = os.environ.get("SOUNDSTAT_API_KEY", "")
 RELATED_CACHE = {}
+RESOLVE_CACHE = {}
 
 try:
     yt = YTMusic()
@@ -211,6 +212,60 @@ def spotify_search():
     except Exception:
         pass
     return jsonify({"source": "fallback", "results": fallback_catalog(q, limit)})
+
+
+@app.route("/api/resolve")
+def resolve_spoti_style():
+    title = (request.args.get("title") or "").strip()
+    artist = (request.args.get("artist") or "").strip()
+    if not title:
+        return jsonify({"error": "missing title"}), 400
+
+    cache_key = f"{title.lower()}::{artist.lower()}"
+    if cache_key in RESOLVE_CACHE:
+        return jsonify(RESOLVE_CACHE[cache_key])
+
+    q = f"{title} {artist}".strip()
+    best_vid = ""
+    direct_audio = ""
+
+    # 1. Cocokkan ke ytmusicapi untuk mendapat videoId resmi
+    if yt:
+        try:
+            hits = yt.search(q, filter="songs", limit=3)
+            for h in hits:
+                vid = h.get("videoId")
+                if vid and len(vid) == 11:
+                    best_vid = vid
+                    break
+        except Exception:
+            pass
+
+    # 2. Cek kecocokan langsung di Audius (Full MP3 stream tanpa blokir)
+    try:
+        ar = requests.get(
+            "https://discoveryprovider.audius.co/v1/tracks/search",
+            params={"query": q, "limit": 3},
+            timeout=3.0
+        )
+        if ar.ok:
+            for item in ar.json().get("data", []):
+                tid = item.get("id")
+                t_name = (item.get("title") or "").lower()
+                if tid and title.lower()[:6] in t_name:
+                    direct_audio = f"https://discoveryprovider.audius.co/v1/tracks/{tid}/stream"
+                    break
+    except Exception:
+        pass
+
+    result = {
+        "videoId": best_vid,
+        "directAudio": direct_audio,
+        "query": q
+    }
+    if best_vid or direct_audio:
+        RESOLVE_CACHE[cache_key] = result
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
