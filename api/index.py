@@ -267,5 +267,12 @@ def resolve_spoti_style():
         RESOLVE_CACHE[cache_key] = result
     return jsonify(result)
 
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

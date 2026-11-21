@@ -425,13 +425,13 @@
 
     async function fetchCatalog(query, limit = 18) {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=${limit}&_t=${Date.now()}_${Math.random().toString(36).slice(2,7)}`, { cache: "no-store" });
         if (res.ok) {
           const d = await res.json();
           if (d.results && d.results.length > 0) return d.results;
         }
       } catch {}
-      const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&country=ID`);
+      const randOffset = Math.floor(Math.random() * 25); const itunes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}&offset=${randOffset}&country=ID&_t=${Date.now()}`, { cache: "no-store" });
       const json = await itunes.json();
       return (json.results || []).map(i => ({ videoId: "", trackId: String(i.trackId), title: i.trackName, artist: i.artistName, duration: fmtSec((i.trackTimeMillis || 0) / 1000), cover: (i.artworkUrl100 || "").replace("100x100bb", "500x500bb"), previewUrl: i.previewUrl || "" }));
     }
@@ -561,47 +561,68 @@
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
-      document.getElementById("shuffleBtn").style.color = "#FF0055";
+      const shBtn = document.getElementById("shuffleBtn");
+      if (shBtn) shBtn.style.color = "#FF0055";
       const container = document.getElementById("homeContent");
 
-      const poolQueries = shuffleArr([
-        "Jess Benko Bleachers NIKI Daniel Caesar",
-        "Arctic Monkeys Dua Lipa Coldplay Billie Eilish",
-        "The 1975 Clairo beabadoobee Alec Benjamin",
-        "Tame Impala Glass Animals Stromae Lorde",
-        "Frank Ocean Rex Orange County Bruno Mars Olivia Rodrigo",
-        "Tulus Nadin Amizah Hindia Sal Priadi",
-        "girl in red Phoebe Bridgers Novo Amor mxmtoon",
-        "LANY Sasha Alex Sloan Jeremy Zucker Chelsea Cutler"
-      ]);
+      const popularPools = [
+        "Sabrina Carpenter Chappell Roan Billie Eilish 2026",
+        "Bruno Mars Lady Gaga ROSÉ APT viral hits",
+        "Gracie Abrams Tate McRae Charli xcx Benson Boone",
+        "Kendrick Lamar SZA The Weeknd Travis Scott hits",
+        "Arctic Monkeys Dua Lipa Coldplay Central Cee",
+        "Tame Impala Glass Animals Stromae Fred again",
+        "Daniel Caesar Frank Ocean Brent Faiyaz NIKI",
+        "Olivia Rodrigo Conan Gray d4vd Wave to Earth",
+        "Tulus Bernadya Mahalini Juicy Luicy Sal Priadi",
+        "Hindia Nadin Amizah Feby Putri Pamungkas",
+        "LANY Keshi Jeremy Zucker Lauv Ruel",
+        "Ravyn Lenae PinkPantheress Beabadoobee Clairo",
+        "Post Malone Morgan Wallen Teddy Swims Hozier",
+        "Cigarettes After Sex The Neighbourhood Chase Atlantic",
+        "SZA Summer Walker Kehlani Victoria Monet",
+        "Troye Sivan Lorde Raye Adele Sam Smith",
+        "Coldplay Imagine Dragons OneRepublic Maroon 5",
+        "Jung Kook NewJeans aespa Jennie Lisa hits",
+        "Drake Playboi Carti Metro Boomin Future",
+        "Top Global Hits 2026 Viral TikTok Songs"
+      ];
+
+      const picked = shuffleArr(popularPools).slice(0, 5);
+      let seenHistory = [];
+      try { seenHistory = JSON.parse(sessionStorage.getItem("vibe_seen") || "[]"); } catch {}
 
       try {
-        const [b1, b2, b3, b4] = await Promise.all([
-          fetchCatalog(poolQueries[0], 18),
-          fetchCatalog(poolQueries[1], 18),
-          fetchCatalog(poolQueries[2], 18),
-          fetchCatalog(poolQueries[3], 22)
-        ]);
+        const batches = await Promise.all(picked.map(q => fetchCatalog(q, 20)));
+        const combined = shuffleArr(batches.flat());
 
-        const combined = shuffleArr([...b1, ...b2, ...b3, ...b4]);
         const uniqueMap = new Map();
         for (const t of combined) {
-          const key = `${(t.title || "").toLowerCase()}-${(t.artist || "").toLowerCase()}`;
+          const key = `${(t.title || "").toLowerCase().trim()}-${(t.artist || "").toLowerCase().trim()}`;
+          if (!key || key === "-") continue;
           if (!uniqueMap.has(key)) uniqueMap.set(key, t);
         }
-        const uniqueTracks = shuffleArr([...uniqueMap.values()]);
 
-        const mixList = uniqueTracks.slice(0, 8);
-        const shortcutList = uniqueTracks.slice(8, 17);
-        const euroMix = shuffleArr(b2).slice(0, 10);
-        const scrollList = uniqueTracks.slice(17, 52);
+        let allUnique = shuffleArr([...uniqueMap.values()]);
+        const freshOnly = allUnique.filter(t => !seenHistory.includes((t.title || "").toLowerCase()));
+        if (freshOnly.length >= 24) {
+          allUnique = [...freshOnly, ...allUnique.filter(t => seenHistory.includes((t.title || "").toLowerCase()))];
+        }
+
+        const nextSeen = [...new Set([...seenHistory, ...allUnique.slice(0, 20).map(t => (t.title || "").toLowerCase())])].slice(-80);
+        try { sessionStorage.setItem("vibe_seen", JSON.stringify(nextSeen)); } catch {}
+
+        const mixList = allUnique.slice(0, 8);
+        const shortcutList = allUnique.slice(8, 17);
+        const euroMix = shuffleArr(batches[2] || allUnique.slice(17, 27)).slice(0, 10);
+        const scrollList = allUnique.slice(17, 55);
 
         queue = [...mixList, ...scrollList, ...shortcutList, ...euroMix];
 
         container.innerHTML = `
           <div class="section">
             <div class="sec-row-head">
-              <span class="section-title">Mix lagu</span>
+              <span class="section-title">Mix lagu populer</span>
               <button class="play-all-btn" onclick="playMixAll(0)">Putar semua</button>
             </div>
             <div class="quick-grid">${mixList.map(t => renderMixRow(t)).join("")}</div>
@@ -621,14 +642,14 @@
 
           <div class="section">
             <div class="sec-row-head">
-              <span class="section-title">Mix Eropa &amp; Pilihan Acak</span>
+              <span class="section-title">Mix Eropa &amp; Hits Viral</span>
             </div>
             <div class="cards-row">${euroMix.map(t => renderVCard(t)).join("")}</div>
           </div>
 
           <div class="section">
             <div class="sec-row-head">
-              <span class="section-title">Jelajahi Lebih Banyak</span>
+              <span class="section-title">Populer &amp; Acak Untukmu</span>
             </div>
             <div class="v-list">${scrollList.map((t, i) => renderNumberedRow(t, i + 1)).join("")}</div>
           </div>
@@ -704,15 +725,59 @@
         else { userPaused = false; ytPlayer.playVideo(); }
       }
     }
-    function playNext() {
+    let isFetchingMoreQueue = false;
+    async function replenishInfiniteQueue() {
+      if (!autoPlaySimilar || isFetchingMoreQueue) return;
+      isFetchingMoreQueue = true;
+      try {
+        const cur = queue[currentIndex] || {};
+        const queries = [
+          `${cur.artist || "Sabrina Carpenter"} mix`,
+          "Top Global Viral Hits 2026",
+          "Billie Eilish Bruno Mars SZA NIKI",
+          "Tulus Bernadya Juicy Luicy Hindia"
+        ];
+        const rq = queries[Math.floor(Math.random() * queries.length)];
+        const more = await fetchCatalog(rq, 20);
+        const existingKeys = new Set(queue.map(x => `${(x.title||"").toLowerCase()}-${(x.artist||"").toLowerCase()}`));
+        const fresh = shuffleArr(more).filter(x => !existingKeys.has(`${(x.title||"").toLowerCase()}-${(x.artist||"").toLowerCase()}`));
+        if (fresh.length) {
+          queue.push(...fresh);
+          const wrap = document.getElementById("autoPlayItemsWrap");
+          if (wrap && document.getElementById("fpDrawer").style.display === "flex") {
+            wrap.insertAdjacentHTML("beforeend", fresh.map(t => {
+              const u = registerTrack(t);
+              return `<div class="q-item" onclick="selectTrackById('${u}'); openDrawer('queue');">
+                <img src="${escHtml(t.cover)}" loading="lazy" />
+                <div class="q-item-meta">
+                  <div class="q-item-title">${escHtml(t.title)}</div>
+                  <div class="q-item-sub">${escHtml(t.artist)} • ${escHtml(t.duration)}</div>
+                </div>
+                <span class="q-drag">=</span>
+              </div>`;
+            }).join(""));
+          }
+        }
+      } catch {}
+      isFetchingMoreQueue = false;
+    }
+
+    async function playNext() {
       if (!queue.length) return;
       if (repeatMode === 2 && currentIndex >= 0) { playAtIndex(currentIndex); return; }
+      if (autoPlaySimilar && (queue.length - currentIndex) <= 4) {
+        replenishInfiniteQueue();
+      }
       if (isShuffle && queue.length > 1) {
         let nextIdx = Math.floor(Math.random() * queue.length);
         if (nextIdx === currentIndex) nextIdx = (currentIndex + 1) % queue.length;
         playAtIndex(nextIdx);
       } else {
-        playAtIndex((currentIndex + 1) % queue.length);
+        const nextIdx = currentIndex + 1;
+        if (nextIdx >= queue.length && autoPlaySimilar) {
+          await replenishInfiniteQueue();
+        }
+        playAtIndex(nextIdx % queue.length);
       }
     }
     function playPrev() { if (queue.length) playAtIndex((currentIndex - 1 + queue.length) % queue.length); }
@@ -770,6 +835,11 @@
         const q = query || `${cur.artist || "Daniel Caesar NIKI"} mix`;
         const items = await fetchCatalog(q, 14);
         autoPlayList = items;
+        if (autoPlaySimilar) {
+          const ex = new Set(queue.map(x => `${(x.title||"").toLowerCase()}-${(x.artist||"").toLowerCase()}`));
+          const addables = items.filter(x => !ex.has(`${(x.title||"").toLowerCase()}-${(x.artist||"").toLowerCase()}`));
+          queue.push(...addables);
+        }
         wrap.innerHTML = items.map(t => {
           const u = registerTrack(t);
           return `<div class="q-item" onclick="selectTrackById('${u}'); openDrawer('queue');">
